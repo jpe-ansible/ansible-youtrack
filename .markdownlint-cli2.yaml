@@ -1,0 +1,17 @@
+---
+# markdownlint-cli2 configuration for the Markdown in this repository.
+#
+# Prose lines may run to 160 characters. Code wrapping is outside this rule.
+#
+# Schema: https://github.com/DavidAnson/markdownlint-cli2/blob/main/schema/markdownlint-cli2-config-schema.json
+
+config:
+  MD013:
+    line_length: 160
+    tables: true
+    strict: true
+    # `heading_line_length` and `code_block_line_length` are deliberately not set.
+
+# Files to skip entirely.
+ignores:
+  - "CHANGELOG.md"
