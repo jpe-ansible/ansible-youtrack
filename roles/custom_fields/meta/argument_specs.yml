@@ -6,27 +6,31 @@ argument_specs:
       youtrack_url:
         type: str
         required: true
-        description: Base URL of the YouTrack server, without a trailing slash.
+        description: Base URL of the YouTrack server, for example https://youtrack.example.com. No trailing slash.
       youtrack_api_key:
         type: str
         required: true
         no_log: true
-        description: API token sent as a bearer token on every request.
+        description: >-
+          Permanent token of a user who can administer fields and projects. Sent as a bearer token and never logged.
       youtrack_validate_certs:
         type: bool
         required: false
-        description: Verify the server certificate. Defaults to true.
-      youtrack_custom_fields:
+        default: true
+        description: Verify the server certificate. Set to false only for a test server with a self-signed certificate.
+      custom_fields_declared:
         type: list
         elements: dict
         required: false
+        default: []
         description: >-
-          Global custom fields to ensure. Missing fields are created and attached. Nothing is detached or removed.
-          Defaults to an empty list.
+          Global custom fields to ensure. A missing field is created, and it is attached to each declared project that
+          does not have it yet. Nothing is detached or removed.
         options:
           name:
             type: str
             required: true
+            description: Name of the custom field. The field is matched by this name.
           field_type:
             type: str
             required: true
@@ -41,13 +45,14 @@ argument_specs:
               - enum[1]
               - enum[*]
               - state[1]
-              - state[*]
-            description: Field type identifier. A field of type enum or state needs a bundle.
+            description: >-
+              Field type. An enum or state field needs a bundle. The type of an existing field is never changed.
           bundle:
             type: str
             required: false
             description: >-
-              Name of the existing enum or state bundle that the field defaults to. Required for enum and state types.
+              Name of an existing enum or state bundle. It is the default bundle of a new field, and each attachment
+              must already use it.
           projects:
             type: list
             elements: str

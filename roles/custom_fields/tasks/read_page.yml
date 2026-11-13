@@ -1,0 +1,60 @@
+---
+# Reads one page of a list, then the next page, until a page comes back empty.
+# The complete list is left in custom_fields_paged_result.
+# Inputs: custom_fields_paged_url, custom_fields_paged_size, custom_fields_paged_max,
+# custom_fields_paged_skip, custom_fields_paged_rows, custom_fields_paged_what and
+# custom_fields_paged_validate_certs.
+- name: Stop when the list is longer than the read limit
+  ansible.builtin.fail:
+    msg: >-
+      The list of {{ custom_fields_paged_what }} has more than {{ custom_fields_paged_max }} entries.
+      The run stopped rather than act on a partial list.
+  when: custom_fields_paged_skip | int > custom_fields_paged_max | int
+
+- name: Read one page of the list
+  block:
+    - name: Request the page
+      ansible.builtin.uri:
+        url: "{{ custom_fields_paged_url }}&$top={{ custom_fields_paged_size }}&$skip={{ custom_fields_paged_skip }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ custom_fields_paged_validate_certs }}"
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: custom_fields_paged_response
+  rescue:
+    - name: Stop when the page cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading the {{ custom_fields_paged_what }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
+
+- name: Stop when the server does not return a list
+  ansible.builtin.assert:
+    that:
+      - custom_fields_paged_response.json is sequence
+      - custom_fields_paged_response.json is not mapping
+    fail_msg: "Reading the {{ custom_fields_paged_what }} returned a response that is not a list."
+
+- name: Keep the complete list when the page is empty
+  ansible.builtin.set_fact:
+    custom_fields_paged_result: "{{ custom_fields_paged_rows }}"
+  when: custom_fields_paged_response.json | length == 0
+
+# The next page gets its own names. Passing custom_fields_paged_rows to itself would make the template refer to itself.
+- name: Keep the rows and offset for the next page
+  ansible.builtin.set_fact:
+    custom_fields_paged_next_rows: "{{ custom_fields_paged_rows + custom_fields_paged_response.json }}"
+    custom_fields_paged_next_skip: "{{ custom_fields_paged_skip | int + custom_fields_paged_response.json | length }}"
+  when: custom_fields_paged_response.json | length > 0
+
+- name: Read the next page
+  ansible.builtin.include_tasks: read_page.yml
+  when: custom_fields_paged_response.json | length > 0
+  vars:
+    custom_fields_paged_rows: "{{ custom_fields_paged_next_rows }}"
+    custom_fields_paged_skip: "{{ custom_fields_paged_next_skip }}"

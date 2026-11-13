@@ -2,69 +2,89 @@
 - name: Find the project
   ansible.builtin.set_fact:
     custom_fields_project_now: >-
-      {{ custom_fields_reads['projects'] | selectattr('shortName', 'equalto', custom_fields_project) | list
-         | first | default({}) }}
+      {{ custom_fields_reads['projects'] | selectattr('shortName', 'equalto', custom_fields_project) | list | first
+         | default({}, true) }}
 
 - name: Stop when the project does not exist
   ansible.builtin.fail:
     msg: "Project {{ custom_fields_project }} was not found."
   when: custom_fields_project_now.id is not defined
 
-- name: Read the custom fields attached to the project
-  when: custom_fields_now.id is defined
+- name: Set the attachments of the project to an empty list for a new custom field
+  ansible.builtin.set_fact:
+    custom_fields_attached: []
+
+- name: Read every page of the attachments of the project
+  when: custom_fields_existed | bool
   block:
-    - name: Request the attachments of the project
-      ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ custom_fields_projects_path }}/{{ custom_fields_project_now.id }}/customFields\
-          ?fields=id,canBeEmpty,field(id,name),bundle(id)&$top={{ custom_fields_page_size }}"
-        method: GET
-        headers:
-          Accept: application/json
-          Authorization: "Bearer {{ youtrack_api_key }}"
-        validate_certs: "{{ custom_fields_validate_certs }}"
-      check_mode: false
-      no_log: true
-      register: custom_fields_attached
-  rescue:
-    - name: Stop when the attachments of the project cannot be read
-      ansible.builtin.fail:
-        msg: >-
-          Reading the attachments of project {{ custom_fields_project }} failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+    - name: Read the attachments
+      ansible.builtin.include_tasks: read_page.yml
+      vars:
+        custom_fields_paged_url: "{{ youtrack_url }}{{ custom_fields_projects_path }}\
+          /{{ custom_fields_project_now.id }}/customFields?fields=id,canBeEmpty,field(id,name),bundle(id,name)"
+        custom_fields_paged_size: "{{ custom_fields_page_size }}"
+        custom_fields_paged_max: "{{ custom_fields_read_limit }}"
+        custom_fields_paged_skip: 0
+        custom_fields_paged_rows: []
+        custom_fields_paged_what: "attachments of project {{ custom_fields_project }}"
+        custom_fields_paged_validate_certs: "{{ custom_fields_validate_certs }}"
+
+    - name: Keep the attachments of the project
+      ansible.builtin.set_fact:
+        custom_fields_attached: "{{ custom_fields_paged_result }}"
 
 - name: Find the attachment of the custom field
   ansible.builtin.set_fact:
     custom_fields_attachment: >-
-      {{ custom_fields_attached.json | selectattr('field.name', 'equalto', custom_fields_item.name) | list
-         | first | default({}) }}
-  when: custom_fields_now.id is defined
+      {{ custom_fields_attached | selectattr('field.id', 'equalto', custom_fields_now.id | default('', true))
+         | list | first | default({}, true) }}
 
-# shortcut: the attach body for an enum or state field carries the default bundle and fixes isPublic to true. The
-# shape with a bundle is assumed from the enum shape and is not confirmed for state fields.
-- name: Attach the custom field to the project
+- name: Stop when the attachment has another bundle
+  ansible.builtin.fail:
+    msg: >-
+      Custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }} has bundle
+      {{ (custom_fields_attachment.bundle | default({}, true)).name | default('none', true) }}, not
+      {{ custom_fields_item.bundle }}. The role does not change the bundle of an attachment. Change the bundle in
+      YouTrack or change the declaration.
   when:
-    - custom_fields_now.id is defined
-    - custom_fields_attachment.id is not defined
+    - custom_fields_attachment.id is defined
+    - custom_fields_kind in custom_fields_bundle_types
+    - (custom_fields_attachment.bundle | default({}, true)).id | default('', true) != custom_fields_bundle_id
+
+- name: Clear the result of an earlier request of this kind
+  ansible.builtin.set_fact:
+    custom_fields_attach_added: {}
+
+# The attach body is the documented one: the field id and the attachment type.
+# shortcut: the attachment takes its bundle from the field default. The documented attach body names no bundle.
+# A live server must confirm this. A bundle that differs from the declaration stops the run.
+# canBeEmpty is set afterwards when it differs, because the documented attach body has no canBeEmpty.
+- name: Attach the custom field to the project when it is not attached
+  when: custom_fields_attachment.id is not defined
   block:
+    - name: Report the attachment that check mode would create
+      ansible.builtin.debug:
+        msg: "Would attach custom field {{ custom_fields_item.name }} to project {{ custom_fields_project }}."
+      changed_when: true
+      when: ansible_check_mode
+
     - name: Request the attachment
       ansible.builtin.uri:
         url: "{{ youtrack_url }}{{ custom_fields_projects_path }}/{{ custom_fields_project_now.id }}/customFields\
-          ?fields=id,canBeEmpty"
+          ?fields=id,canBeEmpty,field(id,name),bundle(id,name)"
         method: POST
         headers:
           Accept: application/json
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
-        body: >-
-          {{ {'field': {'id': custom_fields_now.id},
-              'canBeEmpty': (custom_fields_item.can_be_empty | default(true)),
-              'isPublic': true,
-              '$type': custom_fields_project_type}
-             | combine({'bundle': {'id': custom_fields_bundle_id,
-                                   '$type': custom_fields_type_names.bundle_type}}
-                       if custom_fields_kind in custom_fields_bundle_types else {}) }}
+        body:
+          field:
+            id: "{{ custom_fields_now.id }}"
+          $type: "{{ custom_fields_project_type }}"
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: custom_fields_attach_added
@@ -72,32 +92,55 @@
     - name: Stop when the custom field cannot be attached
       ansible.builtin.fail:
         msg: >-
-          Attaching custom field {{ custom_fields_item.name }} to project {{ custom_fields_project }}
-          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+          Attaching custom field {{ custom_fields_item.name }} to project {{ custom_fields_project }} failed with HTTP
+          status {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
-# shortcut: updating canBeEmpty on an existing attachment is assumed to post the attachment body to the attachment id.
-# This update is not confirmed on the server. Only canBeEmpty is compared and changed. The bundle of an existing
-# attachment is not compared.
-- name: Update canBeEmpty of the attachment when it differs
+- name: Stop when the new attachment has another bundle
+  ansible.builtin.fail:
+    msg: >-
+      Custom field {{ custom_fields_item.name }} attached to project {{ custom_fields_project }} has bundle
+      {{ (custom_fields_attach_added.json.bundle | default({}, true)).name | default('none', true) }}, not
+      {{ custom_fields_item.bundle }}. Set the default bundle of the field in YouTrack, then run the role again.
   when:
-    - custom_fields_now.id is defined
-    - custom_fields_attachment.id is defined
-    - custom_fields_attachment.canBeEmpty | default(none) != (custom_fields_item.can_be_empty | default(true))
+    - custom_fields_attach_added.json is defined
+    - custom_fields_kind in custom_fields_bundle_types
+    - (custom_fields_attach_added.json.bundle | default({}, true)).id | default('', true) != custom_fields_bundle_id
+
+- name: Choose the stored copy of the attachment
+  ansible.builtin.set_fact:
+    custom_fields_attachment_target: >-
+      {{ custom_fields_attach_added.json if custom_fields_attach_added.json is defined else custom_fields_attachment }}
+
+# A stored false must count as set. The filter with true would treat it as unset and send the update on every run.
+- name: Set canBeEmpty of the attachment when it differs
+  when:
+    - custom_fields_attachment_target.id is defined
+    - custom_fields_attachment_target.canBeEmpty | default(none) != custom_fields_item.can_be_empty
   block:
+    - name: Report the attachment that check mode would update
+      ansible.builtin.debug:
+        msg: >-
+          Would set canBeEmpty of custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }}
+          to {{ custom_fields_item.can_be_empty | string | lower }}.
+      changed_when: true
+      when: ansible_check_mode
+
     - name: Request the canBeEmpty update
       ansible.builtin.uri:
         url: "{{ youtrack_url }}{{ custom_fields_projects_path }}/{{ custom_fields_project_now.id }}/customFields\
-          /{{ custom_fields_attachment.id }}?fields=id,canBeEmpty"
+          /{{ custom_fields_attachment_target.id }}?fields=id,canBeEmpty"
         method: POST
         headers:
           Accept: application/json
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
         body:
-          canBeEmpty: "{{ custom_fields_item.can_be_empty | default(true) }}"
-          $type: "{{ custom_fields_project_type }}"
+          canBeEmpty: "{{ custom_fields_item.can_be_empty }}"
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: custom_fields_attach_updated
@@ -105,5 +148,6 @@
     - name: Stop when canBeEmpty cannot be updated
       ansible.builtin.fail:
         msg: >-
-          Updating canBeEmpty of custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }}
-          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+          Setting canBeEmpty of custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }} failed
+          with HTTP status {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}

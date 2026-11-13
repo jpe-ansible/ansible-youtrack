@@ -16,9 +16,9 @@
         expect: pass
         provided: >-
           {{ argspec_connection | combine({
-            'youtrack_enum_bundles': [{'name': 'Priorities',
-              'values': [{'name': 'Must', 'color_id': '20', 'description': 'Top tier'}]}],
-            'youtrack_state_bundles': [{'name': 'Work States', 'values': [{'name': 'Hold', 'is_resolved': false}]}]}) }}
+            'bundles_enum': [{'name': 'Types',
+              'values': [{'name': 'Bug', 'color_id': '1'}]}],
+            'bundles_state': [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false}]}]}) }}
       - name: bundles accepts a connection with no bundles
         role: bundles
         expect: pass
@@ -38,16 +38,16 @@
       - name: bundles rejects a bundle without values
         role: bundles
         expect: fail
-        error: "values found in youtrack_enum_bundles"
+        error: "values found in bundles_enum"
         provided: >-
-          {{ argspec_connection | combine({'youtrack_enum_bundles': [{'name': 'Priorities'}]}) }}
+          {{ argspec_connection | combine({'bundles_enum': [{'name': 'Types'}]}) }}
       - name: bundles rejects a state value without is_resolved
         role: bundles
         expect: fail
-        error: "is_resolved found in youtrack_state_bundles"
+        error: "is_resolved found in bundles_state"
         provided: >-
-          {{ argspec_connection | combine({'youtrack_state_bundles':
-            [{'name': 'Work States', 'values': [{'name': 'Hold'}]}]}) }}
+          {{ argspec_connection | combine({'bundles_state':
+            [{'name': 'States', 'values': [{'name': 'Submitted'}]}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail
@@ -59,35 +59,36 @@
         expect: pass
         provided: >-
           {{ argspec_connection | combine({
-            'youtrack_custom_fields': [
-              {'name': 'Priority', 'field_type': 'enum[1]', 'bundle': 'Priorities',
+            'custom_fields_declared': [
+              {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types',
                'projects': ['DEMO'], 'can_be_empty': false},
-              {'name': 'Estimate', 'field_type': 'integer'}]}) }}
+              {'name': 'Due Date', 'field_type': 'date'}]}) }}
       - name: custom_fields rejects an unknown field type
         role: custom_fields
         expect: fail
         error: "field_type"
         provided: >-
-          {{ argspec_connection | combine({'youtrack_custom_fields': [{'name': 'Owner', 'field_type': 'user[1]'}]}) }}
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [{'name': 'Assignee', 'field_type': 'user[1]'}]}) }}
       - name: custom_fields rejects a field without a name
         role: custom_fields
         expect: fail
-        error: "name found in youtrack_custom_fields"
+        error: "name found in custom_fields_declared"
         provided: >-
-          {{ argspec_connection | combine({'youtrack_custom_fields': [{'field_type': 'string'}]}) }}
+          {{ argspec_connection | combine({'custom_fields_declared': [{'field_type': 'string'}]}) }}
       - name: link_types accepts a complete link type
         role: link_types
         expect: pass
         provided: >-
-          {{ argspec_connection | combine({'youtrack_link_types': [{'name': 'Depends',
-            'source_to_target': 'depends on', 'target_to_source': 'is required for', 'directed': true}]}) }}
+          {{ argspec_connection | combine({'link_types_declared': [{'name': 'Part',
+            'source_to_target': 'Part of', 'target_to_source': 'Part of', 'aggregation': true}]}) }}
       - name: link_types rejects a link type without a target label
         role: link_types
         expect: fail
-        error: "target_to_source found in youtrack_link_types"
+        error: "target_to_source found in link_types_declared"
         provided: >-
-          {{ argspec_connection | combine({'youtrack_link_types': [{'name': 'Depends',
-            'source_to_target': 'depends on'}]}) }}
+          {{ argspec_connection | combine({'link_types_declared': [{'name': 'Part',
+            'source_to_target': 'Part of'}]}) }}
 
   tasks:
     - name: Load the bundles argument spec

@@ -2,13 +2,21 @@
 - name: Find the current issue link type
   ansible.builtin.set_fact:
     link_types_now: >-
-      {{ link_types_before.json | selectattr('name', 'equalto', link_types_item.name) | list | first | default({}) }}
+      {{ link_types_before | selectattr('name', 'equalto', link_types_item.name) | list | first | default({}, true) }}
 
-# shortcut: the create request returns the directions, so the update check below sees the created link type. The create
-# body keys follow the list response keys, which are assumed to be the request keys as well.
+- name: Clear the result of an earlier request of this kind
+  ansible.builtin.set_fact:
+    link_types_created: {}
+
 - name: Create the issue link type when it is missing
   when: link_types_now.id is not defined
   block:
+    - name: Report the issue link type that check mode would create
+      ansible.builtin.debug:
+        msg: "Would create issue link type {{ link_types_item.name }}."
+      changed_when: true
+      when: ansible_check_mode
+
     - name: Request the new issue link type
       ansible.builtin.uri:
         url: "{{ youtrack_url }}{{ link_types_path }}?fields=id,name,sourceToTarget,targetToSource,directed,aggregation"
@@ -21,10 +29,12 @@
           name: "{{ link_types_item.name }}"
           sourceToTarget: "{{ link_types_item.source_to_target }}"
           targetToSource: "{{ link_types_item.target_to_source }}"
-          directed: "{{ (link_types_item.directed | default(false)) }}"
-          aggregation: "{{ (link_types_item.aggregation | default(false)) }}"
+          directed: "{{ link_types_item.directed | default(false) }}"
+          aggregation: "{{ link_types_item.aggregation | default(false) }}"
         status_code: [200, 201]
         validate_certs: "{{ link_types_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: link_types_created
@@ -33,39 +43,58 @@
       ansible.builtin.fail:
         msg: >-
           Creating issue link type {{ link_types_item.name }} failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+          {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
-- name: Use the created issue link type
+- name: Choose the stored copy of the issue link type
   ansible.builtin.set_fact:
-    link_types_now: "{{ link_types_created.json }}"
-  when: link_types_created.json is defined
+    link_types_target: >-
+      {{ link_types_created.json if link_types_created.json is defined else link_types_now }}
 
-# shortcut: updating an existing link type is assumed to post the directions to the link type id. This update is not
-# confirmed on the server. The link type name is the key and is never changed.
-- name: Update the directions of the issue link type when they differ
+- name: List the labels and flags that differ from the declaration
+  ansible.builtin.set_fact:
+    link_types_changes: >-
+      {{ (['sourceToTarget']
+          if (link_types_target.sourceToTarget | default('', true)) != link_types_item.source_to_target else [])
+         + (['targetToSource']
+          if (link_types_target.targetToSource | default('', true)) != link_types_item.target_to_source else [])
+         + (['directed']
+          if (link_types_target.directed | default(false, true)) != link_types_item.directed | default(false) else [])
+         + (['aggregation']
+          if (link_types_target.aggregation | default(false, true))
+          != link_types_item.aggregation | default(false) else []) }}
+
+# The update body sends every attribute. The docs say to provide only the attributes to change.
+- name: Update the labels and flags of the issue link type when they differ
   when:
-    - link_types_now.id is defined
-    - >-
-      (link_types_now.sourceToTarget | default('')) != link_types_item.source_to_target
-      or (link_types_now.targetToSource | default('')) != link_types_item.target_to_source
-      or (link_types_now.directed | default(false)) != (link_types_item.directed | default(false))
-      or (link_types_now.aggregation | default(false)) != (link_types_item.aggregation | default(false))
+    - link_types_target.id is defined
+    - link_types_changes | length > 0
   block:
+    - name: Report the issue link type that check mode would update
+      ansible.builtin.debug:
+        msg: >-
+          Would update issue link type {{ link_types_item.name }}: {{ link_types_changes | join(', ') }}.
+      changed_when: true
+      when: ansible_check_mode
+
     - name: Request the update of the issue link type
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ link_types_path }}/{{ link_types_now.id }}?fields=id"
+        url: "{{ youtrack_url }}{{ link_types_path }}/{{ link_types_target.id }}?fields=id"
         method: POST
         headers:
           Accept: application/json
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
         body:
+          name: "{{ link_types_item.name }}"
           sourceToTarget: "{{ link_types_item.source_to_target }}"
           targetToSource: "{{ link_types_item.target_to_source }}"
-          directed: "{{ (link_types_item.directed | default(false)) }}"
-          aggregation: "{{ (link_types_item.aggregation | default(false)) }}"
+          directed: "{{ link_types_item.directed | default(false) }}"
+          aggregation: "{{ link_types_item.aggregation | default(false) }}"
         status_code: [200, 201]
         validate_certs: "{{ link_types_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: link_types_updated
@@ -74,4 +103,5 @@
       ansible.builtin.fail:
         msg: >-
           Updating issue link type {{ link_types_item.name }} failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+          {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}

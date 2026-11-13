@@ -5,14 +5,14 @@
 
 - name: Ensure the enum bundles match the declared bundles
   ansible.builtin.include_tasks: kind.yml
-  when: youtrack_enum_bundles | default([]) | length > 0
+  when: bundles_enum | default([]) | length > 0
   vars:
     bundles_kind: enum
-    bundles_declared: "{{ youtrack_enum_bundles | default([]) }}"
+    bundles_declared: "{{ bundles_enum | default([]) }}"
 
 - name: Ensure the state bundles match the declared bundles
   ansible.builtin.include_tasks: kind.yml
-  when: youtrack_state_bundles | default([]) | length > 0
+  when: bundles_state | default([]) | length > 0
   vars:
     bundles_kind: state
-    bundles_declared: "{{ youtrack_state_bundles | default([]) }}"
+    bundles_declared: "{{ bundles_state | default([]) }}"
