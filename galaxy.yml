@@ -19,21 +19,12 @@ repository: https://github.com/jpe-ansible/ansible-youtrack
 issues: https://github.com/jpe-ansible/ansible-youtrack/issues
 build_ignore:
   - "*.tar.gz"
-  - .DS_Store
-  - .worktrees
-  - .direnv
-  - .github
-  - .envrc
   - .ansible
-  - .ansible-lint
-  - .yamllint
-  - .markdownlint-cli2.yaml
-  - .pre-commit-config.yaml
-  - .readme-validator.yaml
+  - .github
+  - .gitignore
   - .release-please-manifest.json
   - release-please-config.json
   - renovate.json
-  - flake.nix
-  - flake.lock
-  - molecule
   - requirements-ci.txt
+  - VERSION
+  - molecule
