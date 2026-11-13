@@ -1,0 +1,133 @@
+---
+- name: Case bundles - create a missing bundle and add its values
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/enum}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "10-1", name: Types, $type: EnumBundle, values: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/enum/10-1/values}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "10-2", name: Bug, $type: EnumBundleElement}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/enum/10-1/values/10-2}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "10-2", name: Bug, $type: EnumBundleElement}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role
+      ansible.builtin.include_role:
+        name: bundles
+      vars:
+        bundles_enum:
+          - name: Types
+            values:
+              - name: Bug
+                color_id: "1"
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the three writes and their bodies
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 3
+          - "'/bundles/enum?fields=id,name' in stub_writes[0].request.url"
+          - >-
+            stub_writes[0].request.body | from_json == {'name': 'Types', '$type': 'EnumBundle'}
+          - "'/values?fields=' in stub_writes[1].request.url"
+          - "stub_writes[1].request.body | from_json == {'name': 'Bug'}"
+          - "'/values/10-2?fields=id' in stub_writes[2].request.url"
+          - "stub_writes[2].request.body | from_json == {'color': {'id': '1'}}"
+        fail_msg: "The create case sent unexpected writes."
+
+- name: Case bundles - a second run with the same input sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with the stored bundle
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "10-1"
+                  name: Types
+                  values:
+                    - {id: "10-2", name: Bug, color: {id: "1"}}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role
+      ansible.builtin.include_role:
+        name: bundles
+      vars:
+        bundles_enum:
+          - name: Types
+            values:
+              - name: Bug
+                color_id: "1"
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "A second run with unchanged input sent writes."
+
+- name: Case bundles - check mode sends no writes and reports the planned create
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with no bundles
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role with the run-level check flag
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/check_bundles.yml"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: check_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned create is reported
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - "'Would create the enum bundle Types.' in check_run.stdout"
+          - "'Would add value Bug to the enum bundle Types.' in check_run.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned changes."

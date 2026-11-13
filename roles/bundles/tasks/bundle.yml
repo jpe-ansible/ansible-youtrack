@@ -1,14 +1,29 @@
 ---
+- name: Stop when a bundle declares the same value name twice
+  ansible.builtin.assert:
+    that:
+      - bundles_item['values'] | map(attribute='name') | unique | list | length == bundles_item['values'] | length
+    fail_msg: "Bundle {{ bundles_item.name }} declares a value name more than once. Each value name must be unique."
+
 - name: Find the current bundle
   ansible.builtin.set_fact:
     bundles_now: >-
-      {{ bundles_before.json | selectattr('name', 'equalto', bundles_item.name) | list | first | default({}) }}
+      {{ bundles_before | selectattr('name', 'equalto', bundles_item.name) | list | first | default({}, true) }}
 
-# shortcut: the bundle is created empty. Its values are added one at a time by value.yml, which uses the known value
-# request shape. Accepting an empty values list on bundle create is not confirmed.
+- name: Clear the result of an earlier request of this kind
+  ansible.builtin.set_fact:
+    bundles_created: {}
+
 - name: Create the bundle when it is missing
   when: bundles_now.id is not defined
   block:
+    - name: Report the bundle that check mode would create
+      ansible.builtin.debug:
+        msg: "Would create the {{ bundles_kind }} bundle {{ bundles_item.name }}."
+      changed_when: true
+      when: ansible_check_mode
+
+    # The create body names the bundle and its $type and sends no values. Each value is added by its own request below.
     - name: Request the new bundle
       ansible.builtin.uri:
         url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields=id,name"
@@ -22,6 +37,8 @@
           $type: "{{ bundles_kinds[bundles_kind].bundle_type }}"
         status_code: [200, 201]
         validate_certs: "{{ bundles_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: bundles_created
@@ -30,14 +47,15 @@
       ansible.builtin.fail:
         msg: >-
           Creating the {{ bundles_kind }} bundle {{ bundles_item.name }} failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+          {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
 - name: Use the created bundle
   ansible.builtin.set_fact:
     bundles_now: "{{ bundles_created.json }}"
   when: bundles_created.json is defined
 
-- name: Ensure each declared value of the bundle exists
+- name: Ensure each declared value of the bundle exists with its attributes
   ansible.builtin.include_tasks: value.yml
   loop: "{{ bundles_item['values'] }}"
   loop_control:

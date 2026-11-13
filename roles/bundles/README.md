@@ -1,6 +1,7 @@
 # bundles
 
-Creates enum and state bundles in YouTrack, adds their declared values, and updates values that differ.
+Ensures enum and state bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
 
@@ -10,54 +11,57 @@ roles:
     vars:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
-      youtrack_enum_bundles:
-        - name: Priorities
+      bundles_enum:
+        - name: Types
           values:
-            - name: Must
-              color_id: "20"
-              description: Needed for the release.
-      youtrack_state_bundles:
-        - name: Work States
+            - name: Bug
+              color_id: "1"
+      bundles_state:
+        - name: States
           values:
-            - name: In Review
+            - name: Submitted
               is_resolved: false
-            - name: Done
+            - name: Verified
               is_resolved: true
+              description: Issue fix is verified
 ```
 
 ## Inputs
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `youtrack_url` | Yes | None | Base URL of the YouTrack server. |
-| `youtrack_api_key` | Yes | None | Token that can administer bundles. Sent as a bearer token and never logged. |
-| `youtrack_validate_certs` | No | `true` | Verify the server certificate. |
-| `youtrack_enum_bundles` | No | `[]` | Enum bundles to ensure. |
-| `youtrack_state_bundles` | No | `[]` | State bundles to ensure. |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `youtrack_url` | str | Yes | None | Base URL of the YouTrack server, for example `https://youtrack.example.com`. No trailing slash. |
+| `youtrack_api_key` | str | Yes | None | Permanent token of a user who can administer bundles. Sent as a bearer token and never printed. |
+| `youtrack_validate_certs` | bool | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
+| `bundles_enum` | list of dict | No | `[]` | Enum bundles to ensure. |
+| `bundles_state` | list of dict | No | `[]` | State bundles to ensure. |
 
-Each enum bundle has a `name` and a `values` list. Each enum value has:
+Each entry of `bundles_enum` has:
 
-- `name` (required): the value name.
-- `color_id` (optional): a color id from the YouTrack color palette, as a string.
-- `description` (optional): the value description.
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+  - `description` (str, optional): the value description. Left as it is when omitted.
 
-Each state bundle has a `name` and a `values` list. Each state value has:
+Each entry of `bundles_state` has:
 
-- `name` (required): the value name.
-- `is_resolved` (required): `true` when issues in this state count as resolved.
-- `description` (optional): the value description.
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `is_resolved` (bool, required): whether an issue in this state counts as resolved.
+  - `description` (str, optional): the value description. Left as it is when omitted.
 
 ## Behavior
 
 - Creates a missing bundle empty, then adds each declared value to it.
 - Adds a declared value that is missing.
-- Updates a declared value when its description, color, or resolved flag differs from the declaration.
+- Updates a declared value when its description, color or resolved flag differs from the declaration.
 - Leaves values that are not declared as they are.
-- Matches bundles by name and values by name within their bundle.
+- Fails when a bundle declares the same value name twice.
 - Never renames or deletes a bundle or a value.
+- In check mode, reports each bundle, value and update it would change, and makes no write request.
 
 ## Known limits
 
 - Value order is not managed. YouTrack keeps the order it assigns.
-- The request shapes for state values and value updates are not confirmed against a live server. They carry
-  `# shortcut:` comments in the tasks.

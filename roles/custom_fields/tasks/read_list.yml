@@ -1,0 +1,16 @@
+---
+- name: Read every page of the list
+  ansible.builtin.include_tasks: read_page.yml
+  vars:
+    custom_fields_paged_url: "{{ custom_fields_read_url }}"
+    custom_fields_paged_size: "{{ custom_fields_page_size }}"
+    custom_fields_paged_max: "{{ custom_fields_read_limit }}"
+    custom_fields_paged_skip: 0
+    custom_fields_paged_rows: []
+    custom_fields_paged_what: "{{ custom_fields_read_what }}"
+    custom_fields_paged_validate_certs: "{{ custom_fields_validate_certs }}"
+
+- name: Keep the read result for later tasks
+  ansible.builtin.set_fact:
+    custom_fields_reads: >-
+      {{ custom_fields_reads | default({}) | combine({custom_fields_read_key: custom_fields_paged_result}) }}

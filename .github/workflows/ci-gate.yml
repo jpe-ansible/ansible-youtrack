@@ -21,7 +21,7 @@ jobs:
     uses: JacobPEvans/.github/.github/workflows/_ansible-ci.yml@v1
     with:
       emit_gate: true
-      molecule_scenarios: '["argument_specs"]'
+      molecule_scenarios: '["argument_specs", "behavior"]'
       molecule_scenario_filters: |
         argument_specs:
           - 'molecule/argument_specs/**'

@@ -1,0 +1,145 @@
+---
+- name: Case link_types - a missing type is created once
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for an empty list
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/issueLinkTypes}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "20-4"
+                name: Part
+                sourceToTarget: Part of
+                targetToSource: Part of
+                directed: false
+                aggregation: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert one read and one create were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 1
+          - "stub_writes[0].request.url.startswith('/api/issueLinkTypes?fields=')"
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Part', 'sourceToTarget': 'Part of', 'targetToSource': 'Part of',
+            'directed': false, 'aggregation': true}
+          - >-
+            (stub_reads | map(attribute='request.url') | map('regex_findall', '[0-9]+$')
+            | map('first') | list) == ['0']
+        fail_msg: "The create case sent unexpected requests."
+
+- name: Case link_types - a second run with the stored type as declared sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for the stored link type as declared
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "A second run with the same input sent writes."
+
+- name: Case link_types - check mode sends no writes and reports the planned update
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for one stored link type with a stale flag
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: false
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role with the run-level check flag
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/check_link_types.yml"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: check_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned update is reported
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - "'Would update issue link type Part: aggregation.' in check_run.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned changes."

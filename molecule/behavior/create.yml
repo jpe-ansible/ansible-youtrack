@@ -1,0 +1,50 @@
+---
+- name: Start the WireMock stub that stands in for the YouTrack REST API
+  hosts: localhost
+  gather_facts: false
+  vars:
+    stub_container: ansible-youtrack-stub
+    stub_image: wiremock/wiremock:3.13.2
+    stub_port: 18080
+  tasks:
+    - name: Find a stub container left by an earlier run
+      ansible.builtin.command:
+        argv: [docker, ps, --all, --quiet, "--filter", "name=^{{ stub_container }}$"]
+      changed_when: false
+      register: stub_found
+
+    - name: Remove the stub container left by an earlier run
+      ansible.builtin.command:
+        argv: [docker, rm, --force, "{{ stub_container }}"]
+      changed_when: true
+      when: stub_found.stdout | length > 0
+
+    # The port is bound to the loopback address only, so the stub is not reachable from other hosts.
+    - name: Start the stub on the loopback address
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --detach
+          - --name
+          - "{{ stub_container }}"
+          - --publish
+          - "127.0.0.1:{{ stub_port }}:8080"
+          - "{{ stub_image }}"
+      changed_when: true
+
+    - name: Wait until the stub answers its admin API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ stub_port }}/__admin/mappings"
+        status_code: 200
+      register: stub_ready
+      failed_when: false
+      until: stub_ready.status | default(0) == 200
+      retries: 30
+      delay: 2
+
+    - name: Stop when the stub does not answer
+      ansible.builtin.assert:
+        that:
+          - stub_ready.status | default(0) == 200
+        fail_msg: The WireMock stub did not answer on the loopback port.

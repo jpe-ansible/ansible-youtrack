@@ -1,29 +1,44 @@
 # ansible-youtrack
 
-Ansible collection `jpe_ansible.youtrack`: roles that make a JetBrains YouTrack configuration match a declared
+Ansible collection `jpe_ansible.youtrack`. Its roles make a JetBrains YouTrack configuration match a declared
 configuration. They manage enum and state bundles, global custom fields, and issue link types.
+
+[![CI Gate][ci-badge]][ci-runs] [![License][license-badge]](LICENSE)
+
+[ci-badge]: https://github.com/jpe-ansible/ansible-youtrack/actions/workflows/ci-gate.yml/badge.svg?branch=develop
+[ci-runs]: https://github.com/jpe-ansible/ansible-youtrack/actions/workflows/ci-gate.yml
+[license-badge]: https://img.shields.io/badge/license-Apache--2.0-blue.svg
 
 ## Installation
 
-Add the collection to a `requirements.yml` file and install it into a project-local collections path:
-
-```yaml
-collections:
-  - name: https://github.com/jpe-ansible/ansible-youtrack.git
-    type: git
-    version: <release tag>
-```
+Build the collection from this repository and install the tarball:
 
 ```sh
-ANSIBLE_COLLECTIONS_PATH=./collections ansible-galaxy collection install -r requirements.yml
+ansible-galaxy collection build --output-path ./build --force
+ansible-galaxy collection install ./build/jpe_ansible-youtrack-*.tar.gz
 ```
 
 The collection requires Ansible 2.17 or later. It has no collection dependencies.
 
 ## Usage
 
-Reference a role by its fully qualified name. Set the connection variables once for the play. Run the bundles role
-before the custom fields role, because enum and state fields use the bundles.
+1. Create a permanent token for a YouTrack user who can administer bundles, custom fields and link types.
+2. Export the token. Do not write it into a file.
+
+   ```sh
+   export YOUTRACK_API_KEY=<token>
+   ```
+
+3. Run a check run first. It reads the server and writes nothing.
+
+   ```sh
+   ansible-playbook -i localhost, examples/site.yml --check
+   ```
+
+4. Run again without `--check`. Then run it a second time. The second run changes nothing.
+
+The example playbook is in [`examples/site.yml`](examples/site.yml). Its declarations are in
+[`examples/vars/youtrack.yml`](examples/vars/youtrack.yml). A minimal play looks like this:
 
 ```yaml
 - name: Match the YouTrack configuration
@@ -32,41 +47,25 @@ before the custom fields role, because enum and state fields use the bundles.
   vars:
     youtrack_url: https://youtrack.example.com
     youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
+    bundles_enum:
+      - name: Types
+        values:
+          - name: Bug
   roles:
-    - role: jpe_ansible.youtrack.bundles
-      vars:
-        youtrack_enum_bundles:
-          - name: Priorities
-            values:
-              - name: Must
-                color_id: "20"
-                description: Needed for the release.
-              - name: Could
-    - role: jpe_ansible.youtrack.custom_fields
-      vars:
-        youtrack_custom_fields:
-          - name: Priority
-            field_type: enum[1]
-            bundle: Priorities
-            projects:
-              - DEMO
-            can_be_empty: false
-    - role: jpe_ansible.youtrack.link_types
-      vars:
-        youtrack_link_types:
-          - name: Depends
-            source_to_target: depends on
-            target_to_source: is required for
-            directed: true
+    - jpe_ansible.youtrack.bundles
 ```
 
-Read the API key from a secret store or an environment variable at run time. Do not write it into a playbook.
+Run the bundles role before the custom fields role. An enum or state field uses a bundle, so the bundle must exist.
 
-| Role | Manages |
-| --- | --- |
-| [`bundles`](roles/bundles/README.md) | Enum and state bundles and their values. |
-| [`custom_fields`](roles/custom_fields/README.md) | Global custom fields and their project attachments. |
-| [`link_types`](roles/link_types/README.md) | Issue link types and their directions. |
+## Roles
+
+| Role | Manages | Reference |
+| --- | --- | --- |
+| `jpe_ansible.youtrack.bundles` | Enum and state bundles and their values. | [README](roles/bundles/README.md) |
+| `jpe_ansible.youtrack.custom_fields` | Global custom fields and their project attachments. | [README](roles/custom_fields/README.md) |
+| `jpe_ansible.youtrack.link_types` | Issue link types and their labels and flags. | [README](roles/link_types/README.md) |
+
+## Variable reference
 
 ### Connection variables
 
@@ -74,27 +73,77 @@ Every role takes these variables.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `youtrack_url` | Yes | None | Base URL of the YouTrack server, for example `https://youtrack.example.com`. |
-| `youtrack_api_key` | Yes | None | Token from a user who can administer the instance. Sent as a bearer token and never logged. |
+| `youtrack_url` | Yes | None | Base URL of the YouTrack server, for example `https://youtrack.example.com`. No trailing slash. |
+| `youtrack_api_key` | Yes | None | Permanent token of a user with the rights the role needs. Sent as a bearer token and never printed. |
 | `youtrack_validate_certs` | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
+
+### Declaration variables
+
+Each role takes the lists shown below. An empty list, the default, changes nothing.
+
+| Variable | Role | Default | Entry fields |
+| --- | --- | --- | --- |
+| `bundles_enum` | `bundles` | `[]` | `name`, `values` (each value: `name`, `color_id`, `description`) |
+| `bundles_state` | `bundles` | `[]` | `name`, `values` (each value: `name`, `is_resolved`, `description`) |
+| `custom_fields_declared` | `custom_fields` | `[]` | `name`, `field_type`, `bundle`, `projects`, `can_be_empty` |
+| `link_types_declared` | `link_types` | `[]` | `name`, `source_to_target`, `target_to_source`, `directed`, `aggregation` |
+
+The entry fields, their types and their defaults are in each role's README.
 
 ## Behavior
 
-- **Idempotent.** Each role reads the current state first and writes only what differs. A second run with the same
-  input changes nothing.
-- **Additive.** The roles never delete anything. They do not remove a bundle, a bundle value, a field, a project
-  attachment, or a link type. Items you do not declare stay as they are.
-- **Check mode.** Read requests run in check mode. Write requests are skipped, because the `uri` module does not
-  support check mode. A check run reports no changes and does not preview the writes it would make.
-- **Errors.** An HTTP error stops the run and reports the status code. The API key does not appear in the output.
+### Idempotency
+
+Each role reads the current state of its items first, reading every page of each list. It writes only what differs
+from the declaration. A run with the same declaration as the last run changes nothing.
+
+### Check mode
+
+With `--check`, each role reads the server and makes no write request. The `uri` module does not support check mode,
+so each write is skipped by a condition. Each change the role would make is reported as a debug message. The run
+counts it as changed.
+
+`--diff` shows nothing for these roles. The `uri` module returns no diff data, so the predicted changes appear as
+messages instead.
+
+Check mode cannot confirm the default bundle of a custom field whose bundle does not exist yet. The run reports that
+instead of guessing.
+
+### Additive only
+
+The roles create and update. They never delete a bundle, a bundle value, a custom field, a project attachment or a
+link type. They never rename one either. An item that the declaration does not name stays as it is.
+
+### Refusals
+
+The run stops at the item that fails. Items handled earlier in the same run keep their changes. The run stops in these
+cases:
+
+- A custom field exists with another field type. The role never changes a field type.
+- A custom field that is not an enum or state field declares `can_be_empty: false`. Only enum and state fields have
+  this setting.
+- An attachment uses another bundle than the declaration. The role never changes the bundle of an attachment.
+- A named bundle or project does not exist.
+- A bundle declares the same value name twice.
+- A list has more entries than the read limit of 10000. The run stops rather than act on a partial list.
+
+### Errors
+
+An HTTP error stops the run. The message gives the HTTP status and the server's response text, cut to 300 characters.
+The API key is never printed. Requests that carry it set `no_log`.
 
 ## Testing
 
-The `molecule/argument_specs` scenario checks each role's argument spec with valid and invalid input. Run it from
-`molecule/argument_specs` with `molecule test -s default`. It needs a running Docker daemon.
+Each Molecule scenario runs from the repository root and contacts no YouTrack server.
 
-The test suite checks argument validation only. It does not run the tasks against a YouTrack server. Live behavior is
-not yet verified. Tasks whose request shape is unconfirmed carry a `# shortcut:` comment.
+- `molecule test -s argument_specs` checks each role's argument spec with valid and invalid input.
+- `molecule test -s behavior` runs each role against a WireMock stub of the YouTrack REST API. It needs Docker.
+
+## Requirements
+
+- Ansible 2.17 or later.
+- The YouTrack REST API as described in the JetBrains
+  [REST API reference](https://www.jetbrains.com/help/youtrack/devportal/youtrack-rest-api.html).
 
 ## Development
 
@@ -103,8 +152,14 @@ repository root.
 
 ## Contributing
 
-Open a pull request. Keep each commit to one change.
+Open a pull request against `develop`. Keep each commit to one change. A role creates and updates only; it never
+deletes or renames an item. Every task that sends the API key sets `no_log: true`. Examples use
+`https://youtrack.example.com` and the project short name `DEMO`.
 
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
+
+---
+
+Documentation: <https://docs.jacobpevans.com>

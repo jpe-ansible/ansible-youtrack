@@ -1,0 +1,17 @@
+---
+- name: Behavior of the roles against a stub server
+  hosts: localhost
+  gather_facts: false
+  vars:
+    stub_url: http://127.0.0.1:18080
+    stub_json: {"Content-Type": "application/json"}
+    youtrack_url: http://127.0.0.1:18080
+    youtrack_api_key: example-token-do-not-print
+    roles_dir: "{{ playbook_dir }}/../../roles"
+  tasks:
+    - name: Run the bundles cases
+      ansible.builtin.include_tasks: cases/bundles.yml
+    - name: Run the custom_fields cases
+      ansible.builtin.include_tasks: cases/custom_fields.yml
+    - name: Run the link_types cases
+      ansible.builtin.include_tasks: cases/link_types.yml

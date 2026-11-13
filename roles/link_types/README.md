@@ -11,37 +11,36 @@ roles:
     vars:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
-      youtrack_link_types:
-        - name: Depends
-          source_to_target: depends on
-          target_to_source: is required for
-          directed: true
+      link_types_declared:
+        - name: Part
+          source_to_target: Part of
+          target_to_source: Part of
+          aggregation: true
 ```
 
 ## Inputs
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `youtrack_url` | Yes | None | Base URL of the YouTrack server. |
-| `youtrack_api_key` | Yes | None | Token that can administer link types. Sent as a bearer token and never logged. |
-| `youtrack_validate_certs` | No | `true` | Verify the server certificate. |
-| `youtrack_link_types` | No | `[]` | Link types to ensure. |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `youtrack_url` | str | Yes | None | Base URL of the YouTrack server, for example `https://youtrack.example.com`. No trailing slash. |
+| `youtrack_api_key` | str | Yes | None | Permanent token of a user with low-level admin write access. Sent as a bearer token and never printed. |
+| `youtrack_validate_certs` | bool | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
+| `link_types_declared` | list of dict | No | `[]` | Issue link types to ensure. |
 
-Each link type has:
+Each entry of `link_types_declared` has:
 
-- `name` (required): the link type name. The role matches on this name and never changes it.
-- `source_to_target` (required): the label shown from the source issue to the target issue.
-- `target_to_source` (required): the label shown from the target issue back to the source issue.
-- `directed` (optional, default `false`): whether the link has a direction.
-- `aggregation` (optional, default `false`): whether the link is an aggregation.
+- `name` (str, required): the link type name. The link type is matched by this name, and the name is never changed.
+- `source_to_target` (str, required): the label shown from the source issue to the target issue, for example
+  `Part of`.
+- `target_to_source` (str, required): the label shown from the target issue back to the source issue, for example
+  `Part of`.
+- `directed` (bool, optional): whether the link has a direction. Default `false`.
+- `aggregation` (bool, optional): whether the link describes an aggregation. Default `false`.
 
 ## Behavior
 
 - Creates a link type that is missing, with its labels and flags.
-- Updates the labels and flags of an existing link type when any of them differ from the declaration.
+- Updates the labels and flags of an existing link type when any of them differs from the declaration. A flag that the
+  declaration omits counts as `false`.
 - Never renames or deletes a link type.
-
-## Known limits
-
-- The request shape for updating an existing link type is not confirmed against a live server. It carries a
-  `# shortcut:` comment in the task.
+- In check mode, reports each link type it would create or update, and makes no write request.

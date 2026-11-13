@@ -1,0 +1,11 @@
+---
+- name: Load the stub mappings of the case
+  ansible.builtin.uri:
+    url: "{{ stub_url }}/__admin/mappings"
+    method: POST
+    body_format: json
+    body: "{{ item }}"
+    status_code: 201
+  loop: "{{ stub_mappings }}"
+  loop_control:
+    label: "{{ item.request.method }} {{ item.request.urlPath }}"
