@@ -27,12 +27,18 @@ repos:
         name: reject standalone scripts
         language: fail
         entry: Replace the script with a native Ansible feature, a module, or Jinja
-        files: '\.(py|sh|rb)$'
+        types_or: [python, shell, ruby]
+        exclude: ^\.envrc$
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.3
+    rev: v0.24.0
     hooks:
       - id: markdownlint-cli2
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
