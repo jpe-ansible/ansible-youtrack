@@ -11,18 +11,18 @@ roles:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
       youtrack_enum_bundles:
-        - name: Priorities
+        - name: Types
           values:
-            - name: Must
-              color_id: "20"
-              description: Needed for the release.
+            - name: Bug
+              color_id: "1"
       youtrack_state_bundles:
-        - name: Work States
+        - name: States
           values:
-            - name: In Review
+            - name: Open
               is_resolved: false
-            - name: Done
+            - name: Verified
               is_resolved: true
+              description: Issue fix is verified
 ```
 
 ## Inputs

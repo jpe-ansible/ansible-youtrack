@@ -12,14 +12,14 @@ roles:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
       youtrack_custom_fields:
-        - name: Priority
+        - name: Type
           field_type: enum[1]
-          bundle: Priorities
+          bundle: Types
           projects:
             - DEMO
           can_be_empty: false
-        - name: Estimate
-          field_type: integer
+        - name: Due Date
+          field_type: date
           projects:
             - DEMO
 ```

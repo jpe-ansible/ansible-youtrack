@@ -36,28 +36,27 @@ before the custom fields role, because enum and state fields use the bundles.
     - role: jpe_ansible.youtrack.bundles
       vars:
         youtrack_enum_bundles:
-          - name: Priorities
+          - name: Types
             values:
-              - name: Must
-                color_id: "20"
-                description: Needed for the release.
-              - name: Could
+              - name: Bug
+                color_id: "1"
+              - name: Feature
     - role: jpe_ansible.youtrack.custom_fields
       vars:
         youtrack_custom_fields:
-          - name: Priority
+          - name: Type
             field_type: enum[1]
-            bundle: Priorities
+            bundle: Types
             projects:
               - DEMO
             can_be_empty: false
     - role: jpe_ansible.youtrack.link_types
       vars:
         youtrack_link_types:
-          - name: Depends
-            source_to_target: depends on
-            target_to_source: is required for
-            directed: true
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
 ```
 
 Read the API key from a secret store or an environment variable at run time. Do not write it into a playbook.

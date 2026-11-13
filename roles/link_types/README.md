@@ -12,10 +12,10 @@ roles:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
       youtrack_link_types:
-        - name: Depends
-          source_to_target: depends on
-          target_to_source: is required for
-          directed: true
+        - name: Part
+          source_to_target: Part of
+          target_to_source: Part of
+          aggregation: true
 ```
 
 ## Inputs
