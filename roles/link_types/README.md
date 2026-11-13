@@ -44,4 +44,3 @@ Each entry of `link_types_declared` has:
   declaration omits counts as `false`.
 - Never renames or deletes a link type.
 - In check mode, reports each link type it would create or update, and makes no write request.
-

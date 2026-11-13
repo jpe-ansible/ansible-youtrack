@@ -145,6 +145,11 @@ Each Molecule scenario runs from the repository root and contacts no YouTrack se
 - The YouTrack REST API as described in the JetBrains
   [REST API reference](https://www.jetbrains.com/help/youtrack/devportal/youtrack-rest-api.html).
 
+## Development
+
+The repository ships a Nix development shell. Run `direnv allow` once. Then run `pre-commit run --all-files` from the
+repository root.
+
 ## Contributing
 
 Open a pull request against `develop`. Keep each commit to one change. A role creates and updates only; it never
@@ -154,3 +159,7 @@ deletes or renames an item. Every task that sends the API key sets `no_log: true
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
+
+---
+
+Documentation: <https://docs.jacobpevans.com>
