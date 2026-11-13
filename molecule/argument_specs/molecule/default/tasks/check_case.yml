@@ -1,0 +1,19 @@
+---
+# failed_when: false keeps the module's message in the result. The module reports its failure in that message, and a
+# rejected input is detected from it. The expected error text, when a case sets one, must also appear in the message.
+- name: Validate the arguments of the case
+  ansible.builtin.validate_argument_spec:
+    argument_spec: "{{ argspec_options[argspec_case.role] }}"
+    provided_arguments: "{{ argspec_case.provided }}"
+  no_log: true
+  register: argspec_result
+  failed_when: false
+
+- name: Confirm the outcome of the case
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((argspec_result.msg | default('')) is search('Validation of arguments failed'))
+        == (argspec_case.expect == 'fail')
+      - argspec_case.error is not defined or (argspec_result.msg | default('')) is search(argspec_case.error)
+    fail_msg: "Case {{ argspec_case.name }} expected {{ argspec_case.expect }} with its named reason."
