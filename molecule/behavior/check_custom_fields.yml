@@ -1,0 +1,19 @@
+---
+# Run with ansible-playbook --check by a test case, so ansible_check_mode is true for the whole run.
+- name: Custom fields role in check mode
+  hosts: localhost
+  gather_facts: false
+  vars:
+    youtrack_url: "{{ lookup('ansible.builtin.env', 'YTC_TEST_URL') }}"
+    youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KEY') }}"
+  tasks:
+    - name: Run the custom_fields role
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Type
+            field_type: enum[1]
+            bundle: Types
+            projects: [DEMO]
+            can_be_empty: false

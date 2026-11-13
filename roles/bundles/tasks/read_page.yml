@@ -1,0 +1,59 @@
+---
+# Reads one page of a list, then the next page, until a page comes back empty.
+# The complete list is left in bundles_paged_result.
+# Inputs: bundles_paged_url, bundles_paged_size, bundles_paged_max, bundles_paged_skip, bundles_paged_rows,
+# bundles_paged_what and bundles_paged_validate_certs.
+- name: Stop when the list is longer than the read limit
+  ansible.builtin.fail:
+    msg: >-
+      The list of {{ bundles_paged_what }} has more than {{ bundles_paged_max }} entries.
+      The run stopped rather than act on a partial list.
+  when: bundles_paged_skip | int > bundles_paged_max | int
+
+- name: Read one page of the list
+  block:
+    - name: Request the page
+      ansible.builtin.uri:
+        url: "{{ bundles_paged_url }}&$top={{ bundles_paged_size }}&$skip={{ bundles_paged_skip }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ bundles_paged_validate_certs }}"
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: bundles_paged_response
+  rescue:
+    - name: Stop when the page cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading the {{ bundles_paged_what }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
+
+- name: Stop when the server does not return a list
+  ansible.builtin.assert:
+    that:
+      - bundles_paged_response.json is sequence
+      - bundles_paged_response.json is not mapping
+    fail_msg: "Reading the {{ bundles_paged_what }} returned a response that is not a list."
+
+- name: Keep the complete list when the page is empty
+  ansible.builtin.set_fact:
+    bundles_paged_result: "{{ bundles_paged_rows }}"
+  when: bundles_paged_response.json | length == 0
+
+# The next page gets its own names. Passing bundles_paged_rows to itself would make the template refer to itself.
+- name: Keep the rows and offset for the next page
+  ansible.builtin.set_fact:
+    bundles_paged_next_rows: "{{ bundles_paged_rows + bundles_paged_response.json }}"
+    bundles_paged_next_skip: "{{ bundles_paged_skip | int + bundles_paged_response.json | length }}"
+  when: bundles_paged_response.json | length > 0
+
+- name: Read the next page
+  ansible.builtin.include_tasks: read_page.yml
+  when: bundles_paged_response.json | length > 0
+  vars:
+    bundles_paged_rows: "{{ bundles_paged_next_rows }}"
+    bundles_paged_skip: "{{ bundles_paged_next_skip }}"

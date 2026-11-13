@@ -1,28 +1,25 @@
 ---
-- name: Set the list fields for the bundles of this kind
-  ansible.builtin.set_fact:
-    bundles_list_fields: "id,name,values({{ bundles_kinds[bundles_kind].value_fields }})"
+- name: Stop when two declared bundles of this kind have the same name
+  ansible.builtin.assert:
+    that:
+      - bundles_declared | map(attribute='name') | unique | list | length == bundles_declared | length
+    fail_msg: "Two declared {{ bundles_kind }} bundles have the same name. Each bundle name must be unique."
 
-- name: Read the current bundles of this kind
-  block:
-    - name: Request the bundles of this kind
-      ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields={{ bundles_list_fields }}\
-          &$top={{ bundles_page_size }}"
-        method: GET
-        headers:
-          Accept: application/json
-          Authorization: "Bearer {{ youtrack_api_key }}"
-        validate_certs: "{{ bundles_validate_certs }}"
-      check_mode: false
-      no_log: true
-      register: bundles_before
-  rescue:
-    - name: Stop when the bundles cannot be read
-      ansible.builtin.fail:
-        msg: >-
-          Reading the {{ bundles_kind }} bundles failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+- name: Read every bundle of this kind
+  ansible.builtin.include_tasks: read_page.yml
+  vars:
+    bundles_paged_url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}\
+      ?fields=id,name,values({{ bundles_kinds[bundles_kind].value_fields }})"
+    bundles_paged_size: "{{ bundles_page_size }}"
+    bundles_paged_max: "{{ bundles_read_limit }}"
+    bundles_paged_skip: 0
+    bundles_paged_rows: []
+    bundles_paged_what: "{{ bundles_kind }} bundles"
+    bundles_paged_validate_certs: "{{ bundles_validate_certs }}"
+
+- name: Keep the bundles read for the bundle tasks
+  ansible.builtin.set_fact:
+    bundles_before: "{{ bundles_paged_result }}"
 
 - name: Ensure each declared bundle of this kind exists with its values
   ansible.builtin.include_tasks: bundle.yml

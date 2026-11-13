@@ -3,21 +3,26 @@ custom_fields_path: /api/admin/customFieldSettings/customFields
 custom_fields_bundles_path: /api/admin/customFieldSettings/bundles
 custom_fields_projects_path: /api/admin/projects
 
-# Page size for the list requests. A list longer than this is not read.
-# shortcut: the server default page size is not confirmed for these endpoints, so $top is set explicitly.
-custom_fields_page_size: 1000
+# Entries requested per page. Pages are read until one comes back empty, so a longer list is read in full.
+custom_fields_page_size: 100
 
-# REST names for fields that take a bundle.
-# shortcut: StateBundleCustomFieldDefaults is assumed by analogy with EnumBundleCustomFieldDefaults.
+# Most entries that one list read may return. A list that reaches this limit stops the run instead of being cut short.
+custom_fields_read_limit: 10000
+
+# ProjectCustomField $type that a project attachment of each field type takes, from the documented type mapping.
+custom_fields_project_types:
+  string: SimpleProjectCustomField
+  text: TextProjectCustomField
+  integer: SimpleProjectCustomField
+  float: SimpleProjectCustomField
+  date: SimpleProjectCustomField
+  date and time: SimpleProjectCustomField
+  period: PeriodProjectCustomField
+  enum[1]: EnumProjectCustomField
+  enum[*]: EnumProjectCustomField
+  state[1]: StateProjectCustomField
+
+# Bundle $type of each bundle-backed kind. The kind is the field type without its cardinality suffix.
 custom_fields_bundle_types:
-  enum:
-    bundle_type: EnumBundle
-    defaults_type: EnumBundleCustomFieldDefaults
-    project_type: EnumProjectCustomField
-  state:
-    bundle_type: StateBundle
-    defaults_type: StateBundleCustomFieldDefaults
-    project_type: StateProjectCustomField
-
-# Project attachment type for a field that takes no bundle.
-custom_fields_simple_project_type: SimpleProjectCustomField
+  enum: EnumBundle
+  state: StateBundle

@@ -36,4 +36,4 @@ build_ignore:
   - flake.nix
   - flake.lock
   - molecule
-  - requirements-test.txt
+  - requirements-ci.txt

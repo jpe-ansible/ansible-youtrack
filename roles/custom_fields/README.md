@@ -1,7 +1,7 @@
 # custom_fields
 
-Creates global custom fields in YouTrack, attaches them to projects, and updates the empty-value setting on existing
-project attachments.
+Creates global custom fields in YouTrack and attaches them to projects. It sets the empty-value setting on each enum or
+state attachment when it differs from the declaration.
 
 ## Usage
 
@@ -11,49 +11,54 @@ roles:
     vars:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YOUTRACK_API_KEY') }}"
-      youtrack_custom_fields:
-        - name: Priority
+      custom_fields_declared:
+        - name: Type
           field_type: enum[1]
-          bundle: Priorities
+          bundle: Types
           projects:
             - DEMO
           can_be_empty: false
-        - name: Estimate
-          field_type: integer
+        - name: Due Date
+          field_type: date
           projects:
             - DEMO
 ```
 
 ## Inputs
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `youtrack_url` | Yes | None | Base URL of the YouTrack server. |
-| `youtrack_api_key` | Yes | None | Token that can administer fields and projects. Sent as a bearer token and never logged. |
-| `youtrack_validate_certs` | No | `true` | Verify the server certificate. |
-| `youtrack_custom_fields` | No | `[]` | Custom fields to ensure. |
+| Variable | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `youtrack_url` | str | Yes | None | Base URL of the YouTrack server, for example `https://youtrack.example.com`. No trailing slash. |
+| `youtrack_api_key` | str | Yes | None | Permanent token of a user who can administer fields and projects. Sent as a bearer token and never printed. |
+| `youtrack_validate_certs` | bool | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
+| `custom_fields_declared` | list of dict | No | `[]` | Global custom fields to ensure. |
 
-Each custom field has:
+Each entry of `custom_fields_declared` has:
 
-- `name` (required): the field name.
-- `field_type` (required): one of `string`, `text`, `integer`, `float`, `date`, `date and time`, `period`, `enum[1]`,
-  `enum[*]`, `state[1]`, or `state[*]`.
-- `bundle` (required for `enum` and `state` types): the name of a bundle. Create the bundle with the
-  [bundles](../bundles/README.md) role first.
-- `projects` (optional, default `[]`): short names of the projects to attach the field to.
-- `can_be_empty` (optional, default `true`): whether an issue may leave the field empty.
+- `name` (str, required): the field name. The field is matched by this name.
+- `field_type` (str, required): one of `string`, `text`, `integer`, `float`, `date`, `date and time`, `period`,
+  `enum[1]`, `enum[*]` or `state[1]`.
+- `bundle` (str, optional): the name of an existing bundle. Required for `enum[1]`, `enum[*]` and `state[1]`. The role
+  fails when it is missing for these types. It is the default bundle of a new field, and each attachment must use it.
+- `projects` (list of str, optional): short names of the projects the field is attached to. Default `[]`.
+- `can_be_empty` (bool, optional): whether an issue in each attached project may leave the field empty. Default `true`.
+  Only `enum[1]`, `enum[*]` and `state[1]` take `false`. The other types have no empty-value setting. A workflow rule
+  can make a field of another type required.
 
 ## Behavior
 
-- Creates a missing field. For `enum` and `state` types, the field's default bundle is the bundle you name.
-- Fails when a field with the same name exists with a different type. The role never changes a field type.
-- Fails when the named bundle does not exist, and when a named project does not exist.
+- Creates a missing field. For an enum or state type, the named bundle becomes the field's default bundle.
+- Fails when a field with the same name exists with another type. The role never changes the type of a field.
+- Fails when a named bundle does not exist. Check mode reports this instead of failing.
+- Fails when a named project does not exist.
 - Attaches the field to each named project that has no attachment yet.
-- Updates `can_be_empty` on an existing project attachment when it differs from the declaration.
+- Fails when an existing attachment uses another bundle than the declaration. The role does not change the bundle of an
+  attachment.
+- Sets `canBeEmpty` on an enum or state attachment when it differs from `can_be_empty`.
+- Fails when a field of another type declares `can_be_empty: false`.
 - Never deletes a field and never detaches a field from a project.
+- In check mode, reports each field, attachment and update it would change, and makes no write request.
 
 ## Known limits
 
-- The bundle of an existing project attachment is not compared with the declared bundle.
-- The request shapes for attachments, the empty-value update, and the default bundle are not confirmed against a live
-  server. They carry `# shortcut:` comments in the tasks.
+- In check mode, a bundle that does not exist yet cannot be confirmed as the default bundle of a field. The run says so.

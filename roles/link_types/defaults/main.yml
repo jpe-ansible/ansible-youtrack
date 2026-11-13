@@ -1,6 +1,8 @@
 ---
 link_types_path: /api/issueLinkTypes
 
-# Page size for the list request. A list longer than this is not read.
-# shortcut: the server default page size is not confirmed for this endpoint, so $top is set explicitly.
-link_types_page_size: 1000
+# Entries requested per page. Pages are read until one comes back empty, so a longer list is read in full.
+link_types_page_size: 100
+
+# Most entries that one list read may return. A list that reaches this limit stops the run instead of being cut short.
+link_types_read_limit: 10000
