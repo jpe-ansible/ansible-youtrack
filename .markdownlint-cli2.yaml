@@ -12,9 +12,6 @@ config:
     strict: true
     # `heading_line_length` and `code_block_line_length` are deliberately not set.
 
-# Skip every path that .gitignore excludes, such as a local virtualenv.
-gitignore: true
-
 # Files to skip entirely.
 ignores:
   - "CHANGELOG.md"
