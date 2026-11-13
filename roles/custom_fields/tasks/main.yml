@@ -3,41 +3,50 @@
   ansible.builtin.set_fact:
     custom_fields_validate_certs: "{{ youtrack_validate_certs | default(true) }}"
 
+- name: Stop when two declared custom fields have the same name
+  ansible.builtin.assert:
+    that:
+      - >-
+        custom_fields_declared | default([]) | map(attribute='name') | unique | list
+        | length == custom_fields_declared | length
+    fail_msg: "Two declared custom fields have the same name. Each custom field name must be unique."
+  when: custom_fields_declared | default([]) | length > 0
+
 - name: Read the enum bundles
-  ansible.builtin.include_tasks: read.yml
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | length > 0
   vars:
     custom_fields_read_key: enum_bundles
     custom_fields_read_what: enum bundles
-    custom_fields_read_url: >-
-      {{ youtrack_url }}{{ custom_fields_bundles_path }}/enum?fields=id,name&$top={{ custom_fields_page_size }}
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/enum?fields=id,name"
 
 - name: Read the state bundles
-  ansible.builtin.include_tasks: read.yml
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | length > 0
   vars:
     custom_fields_read_key: state_bundles
     custom_fields_read_what: state bundles
-    custom_fields_read_url: >-
-      {{ youtrack_url }}{{ custom_fields_bundles_path }}/state?fields=id,name&$top={{ custom_fields_page_size }}
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/state?fields=id,name"
 
 - name: Read the projects
-  ansible.builtin.include_tasks: read.yml
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | length > 0
   vars:
     custom_fields_read_key: projects
     custom_fields_read_what: projects
-    custom_fields_read_url: >-
-      {{ youtrack_url }}{{ custom_fields_projects_path }}?fields=id,shortName&$top={{ custom_fields_page_size }}
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_projects_path }}?fields=id,shortName"
 
 - name: Read the custom fields
-  ansible.builtin.include_tasks: read.yml
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | length > 0
   vars:
     custom_fields_read_key: fields
     custom_fields_read_what: custom fields
-    custom_fields_read_url: >-
-      {{ youtrack_url }}{{ custom_fields_path }}?fields=id,name,fieldType(id)&$top={{ custom_fields_page_size }}
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_path }}?fields=id,name,fieldType(id)"
 
-- name: Ensure each declared custom field exists and is attached to its projects
+- name: Ensure each declared custom field exists, has its default bundle and is attached to its projects
   ansible.builtin.include_tasks: field.yml
-  loop: "{{ youtrack_custom_fields | default([]) }}"
+  loop: "{{ custom_fields_declared | default([]) }}"
   loop_control:
     loop_var: custom_fields_item
     label: "{{ custom_fields_item.name }}"

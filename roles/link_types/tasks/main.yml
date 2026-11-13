@@ -3,30 +3,36 @@
   ansible.builtin.set_fact:
     link_types_validate_certs: "{{ youtrack_validate_certs | default(true) }}"
 
-- name: Read the current issue link types
-  block:
-    - name: Request the issue link types
-      ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ link_types_path }}?fields=id,name,sourceToTarget,targetToSource,directed,aggregation\
-          &$top={{ link_types_page_size }}"
-        method: GET
-        headers:
-          Accept: application/json
-          Authorization: "Bearer {{ youtrack_api_key }}"
-        validate_certs: "{{ link_types_validate_certs }}"
-      check_mode: false
-      no_log: true
-      register: link_types_before
-  rescue:
-    - name: Stop when the issue link types cannot be read
-      ansible.builtin.fail:
-        msg: >-
-          Reading the issue link types failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+- name: Stop when two declared link types have the same name
+  ansible.builtin.assert:
+    that:
+      - >-
+        link_types_declared | default([]) | map(attribute='name') | unique | list
+        | length == link_types_declared | length
+    fail_msg: "Two declared issue link types have the same name. Each link type name must be unique."
+  when: link_types_declared | default([]) | length > 0
 
-- name: Ensure each declared issue link type exists with its directions
+- name: Read every issue link type
+  ansible.builtin.include_tasks: read_page.yml
+  when: link_types_declared | default([]) | length > 0
+  vars:
+    link_types_paged_url: "{{ youtrack_url }}{{ link_types_path }}\
+      ?fields=id,name,sourceToTarget,targetToSource,directed,aggregation"
+    link_types_paged_size: "{{ link_types_page_size }}"
+    link_types_paged_max: "{{ link_types_read_limit }}"
+    link_types_paged_skip: 0
+    link_types_paged_rows: []
+    link_types_paged_what: issue link types
+    link_types_paged_validate_certs: "{{ link_types_validate_certs }}"
+
+- name: Keep the issue link types read for the link type tasks
+  ansible.builtin.set_fact:
+    link_types_before: "{{ link_types_paged_result }}"
+  when: link_types_declared | default([]) | length > 0
+
+- name: Ensure each declared issue link type exists with its labels and flags
   ansible.builtin.include_tasks: link_type.yml
-  loop: "{{ youtrack_link_types | default([]) }}"
+  loop: "{{ link_types_declared | default([]) }}"
   loop_control:
     loop_var: link_types_item
     label: "{{ link_types_item.name }}"

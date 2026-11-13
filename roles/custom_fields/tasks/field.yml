@@ -1,8 +1,11 @@
 ---
-- name: Set the kind of the custom field
+- name: Set the kind, the project attachment type and the empty-value setting of the custom field
   ansible.builtin.set_fact:
     custom_fields_kind: >-
       {{ custom_fields_item.field_type.split('[')[0] if '[' in custom_fields_item.field_type else 'simple' }}
+    custom_fields_project_type: "{{ custom_fields_project_types[custom_fields_item.field_type] }}"
+    # Ansible does not apply argument spec defaults to the entries of a list, so the default is set here.
+    custom_fields_can_be_empty: "{{ custom_fields_item.can_be_empty | default(true) | bool }}"
 
 - name: Check that a bundle-backed field declares its bundle
   ansible.builtin.assert:
@@ -11,31 +14,39 @@
     fail_msg: >-
       Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }} and needs a bundle.
 
+- name: Check that only a bundle-backed field declares that it cannot be empty
+  ansible.builtin.assert:
+    that:
+      - custom_fields_kind in custom_fields_bundle_types or custom_fields_can_be_empty
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which has no
+      empty-value setting. Only an enum or state field can be set so that it cannot be empty. A workflow rule can
+      make a field of this type required.
+
 - name: Find the current custom field
   ansible.builtin.set_fact:
     custom_fields_now: >-
-      {{ custom_fields_reads['fields'] | selectattr('name', 'equalto', custom_fields_item.name) | list
-         | first | default({}) }}
+      {{ custom_fields_reads['fields'] | selectattr('name', 'equalto', custom_fields_item.name) | list | first
+         | default({}, true) }}
 
 - name: Stop when the custom field exists with another type
   ansible.builtin.fail:
     msg: >-
       Custom field {{ custom_fields_item.name }} exists with type
-      {{ (custom_fields_now.fieldType | default({})).id | default('unknown') }}, not
-      {{ custom_fields_item.field_type }}. This role does not change a field type.
+      {{ (custom_fields_now.fieldType | default({}, true)).id | default('unknown', true) }}, not
+      {{ custom_fields_item.field_type }}. The role does not change the type of a field.
   when:
     - custom_fields_now.id is defined
-    - (custom_fields_now.fieldType | default({})).id | default('') != custom_fields_item.field_type
+    - (custom_fields_now.fieldType | default({}, true)).id | default('', true) != custom_fields_item.field_type
 
-- name: Find the default bundle of the custom field
+- name: Find the id of the declared default bundle
   ansible.builtin.set_fact:
-    custom_fields_bundle_id: "{{ custom_fields_bundle_map.get(custom_fields_item.bundle, '') }}"
+    custom_fields_bundle_id: >-
+      {{ (custom_fields_reads[custom_fields_kind ~ '_bundles'] | items2dict(key_name='name', value_name='id'))
+         .get(custom_fields_item.bundle, '') }}
   when: custom_fields_kind in custom_fields_bundle_types
-  vars:
-    custom_fields_bundle_map: >-
-      {{ custom_fields_reads[custom_fields_kind ~ '_bundles'] | items2dict(key_name='name', value_name='id') }}
 
-- name: Stop when the bundle of the custom field does not exist
+- name: Stop when the declared bundle does not exist
   ansible.builtin.fail:
     msg: >-
       Bundle {{ custom_fields_item.bundle }} for custom field {{ custom_fields_item.name }} was not found.
@@ -43,38 +54,53 @@
   when:
     - custom_fields_kind in custom_fields_bundle_types
     - custom_fields_bundle_id == ''
+    - not ansible_check_mode
 
-- name: Set the type names of the custom field
+- name: Report that check mode cannot yet confirm a bundle that does not exist
+  ansible.builtin.debug:
+    msg: >-
+      Bundle {{ custom_fields_item.bundle }} is not present yet. Check mode cannot confirm the default bundle of
+      custom field {{ custom_fields_item.name }}.
+  when:
+    - custom_fields_kind in custom_fields_bundle_types
+    - custom_fields_bundle_id == ''
+    - ansible_check_mode
+
+- name: Clear the result of an earlier request of this kind
   ansible.builtin.set_fact:
-    custom_fields_type_names: "{{ custom_fields_bundle_types.get(custom_fields_kind, {}) }}"
+    custom_fields_created: {}
 
-- name: Set the project attachment type of the custom field
+- name: Record whether the custom field existed before this run
   ansible.builtin.set_fact:
-    custom_fields_project_type: >-
-      {{ custom_fields_type_names.get('project_type', custom_fields_simple_project_type) }}
+    custom_fields_existed: "{{ custom_fields_now.id is defined }}"
 
-# shortcut: the defaults body for a state field is assumed by analogy with the enum body. Not confirmed.
 - name: Create the custom field when it is missing
   when: custom_fields_now.id is not defined
   block:
+    - name: Report the custom field that check mode would create
+      ansible.builtin.debug:
+        msg: "Would create custom field {{ custom_fields_item.name }} of type {{ custom_fields_item.field_type }}."
+      changed_when: true
+      when: ansible_check_mode
+
+    # isAutoAttached is sent as false, as the documented create sample does.
     - name: Request the new custom field
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ custom_fields_path }}?fields=id,name"
+        url: "{{ youtrack_url }}{{ custom_fields_path }}?fields=id,name,fieldType(id)"
         method: POST
         headers:
           Accept: application/json
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
-        body: >-
-          {{ {'name': custom_fields_item.name,
-              'fieldType': {'id': custom_fields_item.field_type},
-              'isAutoAttached': false}
-             | combine({'fieldDefaults': {'bundle': {'id': custom_fields_bundle_id,
-                                                     '$type': custom_fields_type_names.bundle_type},
-                                          '$type': custom_fields_type_names.defaults_type}}
-                       if custom_fields_kind in custom_fields_bundle_types else {}) }}
+        body:
+          name: "{{ custom_fields_item.name }}"
+          fieldType:
+            id: "{{ custom_fields_item.field_type }}"
+          isAutoAttached: false
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
       changed_when: true
       no_log: true
       register: custom_fields_created
@@ -83,12 +109,45 @@
       ansible.builtin.fail:
         msg: >-
           Creating custom field {{ custom_fields_item.name }} failed with HTTP status
-          {{ ansible_failed_result.status | default('unknown') }}.
+          {{ ansible_failed_result.status | default('unknown') }}. Server response:
+          {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
 - name: Use the created custom field
   ansible.builtin.set_fact:
     custom_fields_now: "{{ custom_fields_created.json }}"
   when: custom_fields_created.json is defined
+
+# The default bundle is set in a request after the field exists. The body names the bundle and its $type.
+- name: Set the default bundle of the new bundle-backed custom field
+  when:
+    - custom_fields_created.json is defined
+    - custom_fields_kind in custom_fields_bundle_types
+  block:
+    - name: Request the default bundle of the custom field
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ custom_fields_path }}/{{ custom_fields_now.id }}/fieldDefaults?fields=id"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          bundle:
+            id: "{{ custom_fields_bundle_id }}"
+            $type: "{{ custom_fields_bundle_types[custom_fields_kind] }}"
+        status_code: [200, 201]
+        validate_certs: "{{ custom_fields_validate_certs }}"
+        return_content: true
+      changed_when: true
+      no_log: true
+      register: custom_fields_defaults_set
+  rescue:
+    - name: Stop when the default bundle cannot be set
+      ansible.builtin.fail:
+        msg: >-
+          Setting bundle {{ custom_fields_item.bundle }} as the default of custom field
+          {{ custom_fields_item.name }} failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
 - name: Attach the custom field to its projects
   ansible.builtin.include_tasks: attach.yml

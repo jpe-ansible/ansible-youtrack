@@ -1,41 +1,44 @@
 ---
 argument_specs:
   main:
-    short_description: Ensure YouTrack issue link types exist with the declared directions.
+    short_description: Ensure YouTrack issue link types exist with the declared labels and flags.
     options:
       youtrack_url:
         type: str
         required: true
-        description: Base URL of the YouTrack server, without a trailing slash.
+        description: Base URL of the YouTrack server, for example https://youtrack.example.com. No trailing slash.
       youtrack_api_key:
         type: str
         required: true
         no_log: true
-        description: API token sent as a bearer token on every request.
+        description: >-
+          Permanent token of a user with low-level admin write access. Sent as a bearer token and never logged.
       youtrack_validate_certs:
         type: bool
         required: false
-        description: Verify the server certificate. Defaults to true.
-      youtrack_link_types:
+        default: true
+        description: Verify the server certificate. Set to false only for a test server with a self-signed certificate.
+      link_types_declared:
         type: list
         elements: dict
         required: false
+        default: []
         description: >-
-          Issue link types to ensure. Missing link types are created and declared directions are updated.
-          Nothing is removed. Defaults to an empty list.
+          Issue link types to ensure. A missing link type is created, and the labels and flags of an existing one are
+          updated when they differ. Nothing is removed.
         options:
           name:
             type: str
             required: true
-            description: Name of the link type. It identifies the link type.
+            description: Name of the link type. The link type is matched by this name, and the name is never changed.
           source_to_target:
             type: str
             required: true
-            description: Label from the source issue to the target issue.
+            description: Label shown from the source issue to the target issue, for example "Part of".
           target_to_source:
             type: str
             required: true
-            description: Label from the target issue to the source issue.
+            description: Label shown from the target issue back to the source issue, for example "Part of".
           directed:
             type: bool
             required: false
