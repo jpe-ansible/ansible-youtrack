@@ -308,3 +308,156 @@
           - "'Would create custom field Type of type enum[1].' in check_run.stdout"
           - "'Would attach custom field Type to project DEMO.' in check_run.stdout"
         fail_msg: "Check mode sent writes or did not report the planned changes."
+
+- name: Case custom_fields - a date field attaches with no canBeEmpty write and an omitted can_be_empty means true
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing date field and an attached enum field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "10-1", name: Types}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: "58-1", name: Type, fieldType: {id: "enum[1]"}}]
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "58-2", name: Due Date, fieldType: {id: date}}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "60-2", field: {id: "58-2", name: Due Date}}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "60-1"
+                  canBeEmpty: true
+                  field: {id: "58-1", name: Type}
+                  bundle: {id: "10-1", name: Types}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with a date field and an enum field that omit can_be_empty
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Due Date
+            field_type: date
+            projects: [DEMO]
+          - name: Type
+            field_type: enum[1]
+            bundle: Types
+            projects: [DEMO]
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert only the create and the attach of the date field were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 2
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Due Date', 'fieldType': {'id': 'date'}, 'isAutoAttached': false}
+          - >-
+            stub_writes[1].request.url.startswith('/api/admin/projects/0-1/customFields?fields=')
+          - >-
+            stub_writes[1].request.body | from_json ==
+            {'field': {'id': '58-2'}, '$type': 'SimpleProjectCustomField'}
+        fail_msg: "The date field case sent unexpected writes."
+
+- name: Case custom_fields - a date field that declares it cannot be empty is refused and nothing is written
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing date field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role, which must refuse the declaration
+      block:
+        - name: Include the custom_fields role
+          ansible.builtin.include_role:
+            name: custom_fields
+          vars:
+            custom_fields_declared:
+              - name: Due Date
+                field_type: date
+                projects: [DEMO]
+                can_be_empty: false
+        - name: Fail when the declaration was not refused
+          ansible.builtin.fail:
+            msg: The role accepted a date field that cannot be empty.
+      rescue:
+        - name: Confirm the refusal explains the setting and omits the key
+          ansible.builtin.assert:
+            that:
+              - "'Only an enum or state field can be set so that it cannot be empty.' in ansible_failed_result.msg"
+              - "youtrack_api_key not in ansible_failed_result.msg"
+            fail_msg: "The refusal message is not the expected one."
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "The refused date field case sent writes."

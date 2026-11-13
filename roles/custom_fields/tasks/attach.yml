@@ -58,7 +58,8 @@
 # The attach body is the documented one: the field id and the attachment type.
 # shortcut: the attachment takes its bundle from the field default. The documented attach body names no bundle.
 # A live server must confirm this. A bundle that differs from the declaration stops the run.
-# canBeEmpty is set afterwards when it differs, because the documented attach body has no canBeEmpty.
+# canBeEmpty of an enum or state attachment is set afterwards when it differs, because the documented attach body has
+# no canBeEmpty. A field of another type has no empty-value setting.
 - name: Attach the custom field to the project when it is not attached
   when: custom_fields_attachment.id is not defined
   block:
@@ -115,14 +116,15 @@
 # A stored false must count as set. The filter with true would treat it as unset and send the update on every run.
 - name: Set canBeEmpty of the attachment when it differs
   when:
+    - custom_fields_kind in custom_fields_bundle_types
     - custom_fields_attachment_target.id is defined
-    - custom_fields_attachment_target.canBeEmpty | default(none) != custom_fields_item.can_be_empty
+    - custom_fields_attachment_target.canBeEmpty | default(none) != custom_fields_can_be_empty
   block:
     - name: Report the attachment that check mode would update
       ansible.builtin.debug:
         msg: >-
           Would set canBeEmpty of custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }}
-          to {{ custom_fields_item.can_be_empty | string | lower }}.
+          to {{ custom_fields_can_be_empty | string | lower }}.
       changed_when: true
       when: ansible_check_mode
 
@@ -136,7 +138,7 @@
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
         body:
-          canBeEmpty: "{{ custom_fields_item.can_be_empty }}"
+          canBeEmpty: "{{ custom_fields_can_be_empty }}"
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
         return_content: true

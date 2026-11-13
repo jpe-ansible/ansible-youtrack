@@ -120,6 +120,8 @@ The run stops at the item that fails. Items handled earlier in the same run keep
 cases:
 
 - A custom field exists with another field type. The role never changes a field type.
+- A custom field that is not an enum or state field declares `can_be_empty: false`. Only enum and state fields have
+  this setting.
 - An attachment uses another bundle than the declaration. The role never changes the bundle of an attachment.
 - A named bundle or project does not exist.
 - A bundle declares the same value name twice.
@@ -137,8 +139,8 @@ The repository has two offline scenarios. Run each one from the repository root.
 - `molecule/argument_specs` checks each role's argument spec with valid and invalid input. Run it with
   `molecule test -s argument_specs`.
 - `molecule/behavior` runs each role against a stub of the YouTrack REST API. It checks the requests sent, paging with
-  a read limit, check-mode predictions, a refused read and a mismatched attachment. It needs a running Docker daemon.
-  Run it with `molecule test -s behavior`.
+  a read limit, check-mode predictions, a refused read, a mismatched attachment and the empty-value setting of each
+  field kind. It needs a running Docker daemon. Run it with `molecule test -s behavior`.
 
 Neither scenario contacts a YouTrack server. A live server must prove these points:
 

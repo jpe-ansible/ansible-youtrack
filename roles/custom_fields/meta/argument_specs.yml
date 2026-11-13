@@ -63,4 +63,6 @@ argument_specs:
             type: bool
             required: false
             default: true
-            description: Whether an issue in each attached project may leave the field empty.
+            description: >-
+              Whether an issue in each attached project may leave the field empty. Only an enum or state field takes
+              false. The role stops when a field of another type declares false.

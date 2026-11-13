@@ -1,9 +1,11 @@
 ---
-- name: Set the kind and the project attachment type of the custom field
+- name: Set the kind, the project attachment type and the empty-value setting of the custom field
   ansible.builtin.set_fact:
     custom_fields_kind: >-
       {{ custom_fields_item.field_type.split('[')[0] if '[' in custom_fields_item.field_type else 'simple' }}
     custom_fields_project_type: "{{ custom_fields_project_types[custom_fields_item.field_type] }}"
+    # Ansible does not apply argument spec defaults to the entries of a list, so the default is set here.
+    custom_fields_can_be_empty: "{{ custom_fields_item.can_be_empty | default(true) | bool }}"
 
 - name: Check that a bundle-backed field declares its bundle
   ansible.builtin.assert:
@@ -11,6 +13,15 @@
       - custom_fields_kind == 'simple' or custom_fields_item.bundle is defined
     fail_msg: >-
       Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }} and needs a bundle.
+
+- name: Check that only a bundle-backed field declares that it cannot be empty
+  ansible.builtin.assert:
+    that:
+      - custom_fields_kind in custom_fields_bundle_types or custom_fields_can_be_empty
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which has no
+      empty-value setting. Only an enum or state field can be set so that it cannot be empty. A workflow rule can
+      make a field of this type required.
 
 - name: Find the current custom field
   ansible.builtin.set_fact:

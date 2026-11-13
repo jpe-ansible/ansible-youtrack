@@ -1,7 +1,7 @@
 # custom_fields
 
-Creates global custom fields in YouTrack and attaches them to projects. It sets the empty-value setting on each
-attachment when it differs from the declaration.
+Creates global custom fields in YouTrack and attaches them to projects. It sets the empty-value setting on each enum or
+state attachment when it differs from the declaration.
 
 ## Usage
 
@@ -42,6 +42,8 @@ Each entry of `custom_fields_declared` has:
   fails when it is missing for these types. It is the default bundle of a new field, and each attachment must use it.
 - `projects` (list of str, optional): short names of the projects the field is attached to. Default `[]`.
 - `can_be_empty` (bool, optional): whether an issue in each attached project may leave the field empty. Default `true`.
+  Only `enum[1]`, `enum[*]` and `state[1]` take `false`. The other types have no empty-value setting. A workflow rule
+  can make a field of another type required.
 
 ## Behavior
 
@@ -52,7 +54,8 @@ Each entry of `custom_fields_declared` has:
 - Attaches the field to each named project that has no attachment yet.
 - Fails when an existing attachment uses another bundle than the declaration. The role does not change the bundle of an
   attachment.
-- Sets `canBeEmpty` on an attachment when it differs from `can_be_empty`.
+- Sets `canBeEmpty` on an enum or state attachment when it differs from `can_be_empty`.
+- Fails when a field of another type declares `can_be_empty: false`.
 - Never deletes a field and never detaches a field from a project.
 - In check mode, reports each field, attachment and update it would change, and makes no write request.
 
