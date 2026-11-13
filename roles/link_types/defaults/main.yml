@@ -1,0 +1,6 @@
+---
+link_types_path: /api/issueLinkTypes
+
+# Page size for the list request. A list longer than this is not read.
+# shortcut: the server default page size is not confirmed for this endpoint, so $top is set explicitly.
+link_types_page_size: 1000

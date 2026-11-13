@@ -1,0 +1,48 @@
+---
+argument_specs:
+  main:
+    short_description: Ensure YouTrack issue link types exist with the declared directions.
+    options:
+      youtrack_url:
+        type: str
+        required: true
+        description: Base URL of the YouTrack server, without a trailing slash.
+      youtrack_api_key:
+        type: str
+        required: true
+        no_log: true
+        description: API token sent as a bearer token on every request.
+      youtrack_validate_certs:
+        type: bool
+        required: false
+        description: Verify the server certificate. Defaults to true.
+      youtrack_link_types:
+        type: list
+        elements: dict
+        required: false
+        description: >-
+          Issue link types to ensure. Missing link types are created and declared directions are updated.
+          Nothing is removed. Defaults to an empty list.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the link type. It identifies the link type.
+          source_to_target:
+            type: str
+            required: true
+            description: Label from the source issue to the target issue.
+          target_to_source:
+            type: str
+            required: true
+            description: Label from the target issue to the source issue.
+          directed:
+            type: bool
+            required: false
+            default: false
+            description: Whether the link has a direction.
+          aggregation:
+            type: bool
+            required: false
+            default: false
+            description: Whether the link describes an aggregation.

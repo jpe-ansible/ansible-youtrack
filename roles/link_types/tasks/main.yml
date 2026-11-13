@@ -1,0 +1,32 @@
+---
+- name: Set the certificate check for the link type requests
+  ansible.builtin.set_fact:
+    link_types_validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+
+- name: Read the current issue link types
+  block:
+    - name: Request the issue link types
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ link_types_path }}?fields=id,name,sourceToTarget,targetToSource,directed,aggregation\
+          &$top={{ link_types_page_size }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ link_types_validate_certs }}"
+      check_mode: false
+      no_log: true
+      register: link_types_before
+  rescue:
+    - name: Stop when the issue link types cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading the issue link types failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Ensure each declared issue link type exists with its directions
+  ansible.builtin.include_tasks: link_type.yml
+  loop: "{{ youtrack_link_types | default([]) }}"
+  loop_control:
+    loop_var: link_types_item
+    label: "{{ link_types_item.name }}"

@@ -1,0 +1,77 @@
+---
+- name: Find the current issue link type
+  ansible.builtin.set_fact:
+    link_types_now: >-
+      {{ link_types_before.json | selectattr('name', 'equalto', link_types_item.name) | list | first | default({}) }}
+
+# shortcut: the create request returns the directions, so the update check below sees the created link type. The create
+# body keys follow the list response keys, which are assumed to be the request keys as well.
+- name: Create the issue link type when it is missing
+  when: link_types_now.id is not defined
+  block:
+    - name: Request the new issue link type
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ link_types_path }}?fields=id,name,sourceToTarget,targetToSource,directed,aggregation"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          name: "{{ link_types_item.name }}"
+          sourceToTarget: "{{ link_types_item.source_to_target }}"
+          targetToSource: "{{ link_types_item.target_to_source }}"
+          directed: "{{ (link_types_item.directed | default(false)) }}"
+          aggregation: "{{ (link_types_item.aggregation | default(false)) }}"
+        status_code: [200, 201]
+        validate_certs: "{{ link_types_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: link_types_created
+  rescue:
+    - name: Stop when the issue link type cannot be created
+      ansible.builtin.fail:
+        msg: >-
+          Creating issue link type {{ link_types_item.name }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Use the created issue link type
+  ansible.builtin.set_fact:
+    link_types_now: "{{ link_types_created.json }}"
+  when: link_types_created.json is defined
+
+# shortcut: updating an existing link type is assumed to post the directions to the link type id. This update is not
+# confirmed on the server. The link type name is the key and is never changed.
+- name: Update the directions of the issue link type when they differ
+  when:
+    - link_types_now.id is defined
+    - >-
+      (link_types_now.sourceToTarget | default('')) != link_types_item.source_to_target
+      or (link_types_now.targetToSource | default('')) != link_types_item.target_to_source
+      or (link_types_now.directed | default(false)) != (link_types_item.directed | default(false))
+      or (link_types_now.aggregation | default(false)) != (link_types_item.aggregation | default(false))
+  block:
+    - name: Request the update of the issue link type
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ link_types_path }}/{{ link_types_now.id }}?fields=id"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          sourceToTarget: "{{ link_types_item.source_to_target }}"
+          targetToSource: "{{ link_types_item.target_to_source }}"
+          directed: "{{ (link_types_item.directed | default(false)) }}"
+          aggregation: "{{ (link_types_item.aggregation | default(false)) }}"
+        status_code: [200, 201]
+        validate_certs: "{{ link_types_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: link_types_updated
+  rescue:
+    - name: Stop when the issue link type cannot be updated
+      ansible.builtin.fail:
+        msg: >-
+          Updating issue link type {{ link_types_item.name }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
