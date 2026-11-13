@@ -37,4 +37,3 @@ build_ignore:
   - flake.lock
   - molecule
   - requirements-ci.txt
-  - requirements-lint.txt

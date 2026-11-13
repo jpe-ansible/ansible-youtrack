@@ -15,87 +15,13 @@ permissions: {}
 
 jobs:
   ci:
-    name: Ansible CI
     permissions:
       contents: read
       pull-requests: read
     uses: JacobPEvans/.github/.github/workflows/_ansible-ci.yml@v1
     with:
-      # The molecule job below runs the scenarios that this job selects.
-      molecule: false
-      # A changed role or molecule path that no entry maps runs every scenario.
-      # Workflow and requirement changes run only the scenarios that map them.
+      emit_gate: true
       molecule_scenario_filters: |
         argument_specs:
-          - 'roles/*/meta/argument_specs.yml'
           - 'molecule/argument_specs/**'
           - '.github/workflows/ci-gate.yml'
-          - 'requirements-ci.txt'
-
-  molecule:
-    name: Molecule
-    needs: ci
-    if: ${{ needs.ci.outputs.molecule == 'true' }}
-    permissions:
-      contents: read
-    uses: JacobPEvans/.github/.github/workflows/_molecule.yml@v1
-    with:
-      # An empty selection means the full suite: every directory under molecule/.
-      scenarios: ${{ needs.ci.outputs.molecule_scenarios }}
-      molecule_workdir_mode: scenario_directory
-      molecule_scenario_arg: default
-      python_install_mode: pip_requirements
-      requirements_files: '["requirements-ci.txt"]'
-
-  pre-commit:
-    name: Pre-commit
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10 # pr-policy: timeout-exception hook environments install on a cold cache
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.14"
-
-      - name: Cache pre-commit hook environments
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml', 'requirements-lint.txt') }}
-
-      - name: Install pre-commit
-        run: python -m pip install -r requirements-lint.txt
-
-      - name: Run every pre-commit hook
-        env:
-          # The Ansible Lint job in Ansible CI runs ansible-lint.
-          SKIP: ansible-lint
-        run: pre-commit run --all-files --show-diff-on-failure
-
-  zizmor:
-    name: Workflow Security
-    permissions:
-      contents: read
-    uses: JacobPEvans/.github/.github/workflows/_zizmor.yml@v1
-
-  gate:
-    name: Merge Gate
-    needs: [ci, molecule, pre-commit, zizmor]
-    if: ${{ always() && !cancelled() }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions: {}
-    steps:
-      - name: Check all results
-        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
-        with:
-          # Molecule is skipped when no changed path selects a scenario.
-          allowed-skips: molecule
-          jobs: ${{ toJSON(needs) }}
