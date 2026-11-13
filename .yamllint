@@ -11,6 +11,12 @@ ignore: |
   # any future encrypted files in subdirectories.
   **/*.enc.yaml
   **/*.enc.yml
+  # Local virtualenv, Ansible cache, molecule runtime and worktrees hold third-party or generated YAML.
+  .venv/
+  .ansible/
+  .molecule/
+  .direnv/
+  .worktrees/
 
 rules:
   line-length:

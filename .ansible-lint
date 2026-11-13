@@ -7,5 +7,7 @@ exclude_paths:
   - .direnv/
   - .venv
   - venv
+  - .ansible/
+  - .molecule/
   - "**/*.enc.yaml"
   - "**/*.enc.yml"
