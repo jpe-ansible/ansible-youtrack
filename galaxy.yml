@@ -37,3 +37,9 @@ build_ignore:
   - flake.lock
   - molecule
   - requirements-ci.txt
+  - .claude
+  - .gitignore
+  - .molecule
+  - .venv
+  - AGENTS.md
+  - CLAUDE.md
