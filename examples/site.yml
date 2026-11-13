@@ -1,0 +1,10 @@
+---
+- name: Match the YouTrack configuration
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/youtrack.yml
+  roles:
+    - jpe_ansible.youtrack.bundles
+    - jpe_ansible.youtrack.custom_fields
+    - jpe_ansible.youtrack.link_types
