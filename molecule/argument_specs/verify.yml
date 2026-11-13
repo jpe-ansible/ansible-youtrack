@@ -92,17 +92,17 @@
   tasks:
     - name: Load the bundles argument spec
       ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/../../../../roles/bundles/meta/argument_specs.yml"
+        file: "{{ playbook_dir }}/../../roles/bundles/meta/argument_specs.yml"
         name: argspec_bundles
 
     - name: Load the custom_fields argument spec
       ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/../../../../roles/custom_fields/meta/argument_specs.yml"
+        file: "{{ playbook_dir }}/../../roles/custom_fields/meta/argument_specs.yml"
         name: argspec_custom_fields
 
     - name: Load the link_types argument spec
       ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/../../../../roles/link_types/meta/argument_specs.yml"
+        file: "{{ playbook_dir }}/../../roles/link_types/meta/argument_specs.yml"
         name: argspec_link_types
 
     - name: Check each argument spec case
