@@ -1,0 +1,18 @@
+---
+# Run with ansible-playbook --check by a test case, so ansible_check_mode is true for the whole run.
+- name: Bundles role in check mode
+  hosts: localhost
+  gather_facts: false
+  vars:
+    youtrack_url: "{{ lookup('ansible.builtin.env', 'YTC_TEST_URL') }}"
+    youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KEY') }}"
+  tasks:
+    - name: Run the bundles role
+      ansible.builtin.include_role:
+        name: bundles
+      vars:
+        bundles_enum:
+          - name: Types
+            values:
+              - name: Bug
+                color_id: "1"

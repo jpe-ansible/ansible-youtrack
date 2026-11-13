@@ -1,0 +1,15 @@
+---
+- name: Read the request journal of the stub server
+  ansible.builtin.uri:
+    url: "{{ stub_url }}/__admin/requests"
+    method: GET
+    status_code: 200
+  register: stub_journal_response
+
+# The journal lists the newest request first. The lists are reversed into the order the requests were sent.
+- name: Keep the write and read requests of the case in the order they were sent
+  ansible.builtin.set_fact:
+    stub_writes: >-
+      {{ stub_journal_response.json.requests | reverse | selectattr('request.method', 'ne', 'GET') | list }}
+    stub_reads: >-
+      {{ stub_journal_response.json.requests | reverse | selectattr('request.method', 'equalto', 'GET') | list }}

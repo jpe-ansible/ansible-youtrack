@@ -1,0 +1,30 @@
+---
+driver:
+  name: default
+
+provisioner:
+  name: ansible
+  inventory:
+    hosts:
+      all:
+        hosts:
+          localhost:
+            ansible_connection: local
+  config_options:
+    defaults:
+      interpreter_python: auto_silent
+      roles_path: ${MOLECULE_PROJECT_DIRECTORY}/roles
+  playbooks:
+    create: create.yml
+    converge: converge.yml
+    destroy: destroy.yml
+
+scenario:
+  test_sequence:
+    - destroy
+    - create
+    - converge
+    - destroy
+
+verifier:
+  name: ansible

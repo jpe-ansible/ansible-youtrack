@@ -1,0 +1,310 @@
+---
+- name: Case custom_fields - create the field, set its default bundle, attach it and set canBeEmpty
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "10-1", name: Types}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "58-1", name: Type, fieldType: {id: "enum[1]"}}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields/58-1/fieldDefaults}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "59-1"}}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "60-1"
+                canBeEmpty: true
+                field: {id: "58-1", name: Type}
+                bundle: {id: "10-1", name: Types}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields/60-1}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "60-1", canBeEmpty: false}}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with a bundle-backed field
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Type
+            field_type: enum[1]
+            bundle: Types
+            projects: [DEMO]
+            can_be_empty: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the four writes in order
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 4
+          - >-
+            stub_writes[0].request.url.startswith('/api/admin/customFieldSettings/customFields?fields=')
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Type', 'fieldType': {'id': 'enum[1]'}, 'isAutoAttached': false}
+          - >-
+            stub_writes[1].request.url.startswith(
+            '/api/admin/customFieldSettings/customFields/58-1/fieldDefaults')
+          - >-
+            stub_writes[1].request.body | from_json ==
+            {'bundle': {'id': '10-1', '$type': 'EnumBundle'}}
+          - >-
+            stub_writes[2].request.url.startswith('/api/admin/projects/0-1/customFields?fields=')
+          - >-
+            stub_writes[2].request.body | from_json ==
+            {'field': {'id': '58-1'}, '$type': 'EnumProjectCustomField'}
+          - >-
+            stub_writes[3].request.url.startswith('/api/admin/projects/0-1/customFields/60-1?fields=')
+          - "stub_writes[3].request.body | from_json == {'canBeEmpty': false}"
+        fail_msg: "The custom field case sent unexpected writes."
+
+- name: Case custom_fields - an attachment with another bundle is refused and nothing is written
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with a mismatched attachment
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: "10-1", name: Types}]
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: "58-1", name: Type, fieldType: {id: "enum[1]"}}]
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "60-1"
+                  canBeEmpty: true
+                  field: {id: "58-1", name: Type}
+                  bundle: {id: "10-9", name: States}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role, which must refuse the mismatch
+      block:
+        - name: Include the custom_fields role
+          ansible.builtin.include_role:
+            name: custom_fields
+          vars:
+            custom_fields_declared:
+              - name: Type
+                field_type: enum[1]
+                bundle: Types
+                projects: [DEMO]
+        - name: Fail when the mismatch was not refused
+          ansible.builtin.fail:
+            msg: The role accepted an attachment with another bundle.
+      rescue:
+        - name: Confirm the refusal names both bundles and omits the key
+          ansible.builtin.assert:
+            that:
+              - "'has bundle States, not Types' in ansible_failed_result.msg"
+              - "youtrack_api_key not in ansible_failed_result.msg"
+            fail_msg: "The refusal message is not the expected one."
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "The mismatch case sent writes."
+
+- name: Case custom_fields - a second run with the attached field sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for the attached field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "10-1", name: Types}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: "58-1", name: Type, fieldType: {id: "enum[1]"}}]
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "60-1"
+                  canBeEmpty: false
+                  field: {id: "58-1", name: Type}
+                  bundle: {id: "10-1", name: Types}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Type
+            field_type: enum[1]
+            bundle: Types
+            projects: [DEMO]
+            can_be_empty: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "A second run with the same input sent writes."
+
+- name: Case custom_fields - check mode sends no writes and reports the planned create and attach
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing field with an existing bundle
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "10-1", name: Types}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with the run-level check flag
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/check_custom_fields.yml"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: check_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned create and attach are reported
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - "'Would create custom field Type of type enum[1].' in check_run.stdout"
+          - "'Would attach custom field Type to project DEMO.' in check_run.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned changes."

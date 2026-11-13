@@ -1,0 +1,400 @@
+---
+- name: Case link_types - reads stored types two at a time and sends no writes when the type is current
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for three stored link types
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+                - id: "20-2"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "2"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-3"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "3"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role with a page size of two
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_page_size: 2
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert three pages were read and no write was sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - >-
+            (stub_reads | map(attribute='request.url') | map('regex_findall', '[0-9]+$')
+            | map('first') | list) == ['0', '2', '3']
+        fail_msg: "The paged read or the no-op case sent unexpected requests."
+
+- name: Case link_types - a missing type is created once
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for an empty list
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/issueLinkTypes}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "20-4"
+                name: Part
+                sourceToTarget: Part of
+                targetToSource: Part of
+                directed: false
+                aggregation: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert one read and one create were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 1
+          - "stub_writes[0].request.url.startswith('/api/issueLinkTypes?fields=')"
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Part', 'sourceToTarget': 'Part of', 'targetToSource': 'Part of',
+            'directed': false, 'aggregation': true}
+          - >-
+            (stub_reads | map(attribute='request.url') | map('regex_findall', '[0-9]+$')
+            | map('first') | list) == ['0']
+        fail_msg: "The create case sent unexpected requests."
+
+- name: Case link_types - a stored type with another flag is updated with the full body
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for one stored link type with a stale flag
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: false
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/issueLinkTypes/20-1}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "20-1"
+                name: Part
+                sourceToTarget: Part of
+                targetToSource: Part of
+                directed: false
+                aggregation: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert one update with the full body was sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 1
+          - "stub_writes[0].request.url.startswith('/api/issueLinkTypes/20-1?fields=id')"
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Part', 'sourceToTarget': 'Part of', 'targetToSource': 'Part of',
+            'directed': false, 'aggregation': true}
+        fail_msg: "The update case sent unexpected requests."
+
+- name: Case link_types - a second run with the stored type as declared sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for the stored link type as declared
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role
+      ansible.builtin.include_role:
+        name: link_types
+      vars:
+        link_types_declared:
+          - name: Part
+            source_to_target: Part of
+            target_to_source: Part of
+            aggregation: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "A second run with the same input sent writes."
+
+- name: Case link_types - check mode sends no writes and reports the planned update
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for one stored link type with a stale flag
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: false
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role with the run-level check flag
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/check_link_types.yml"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: check_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned update is reported
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - "'Would update issue link type Part: aggregation.' in check_run.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned changes."
+
+- name: Case link_types - an HTTP error on the read stops the run and shows the server text without the key
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mapping that refuses the read
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 403
+              headers: "{{ stub_json }}"
+              jsonBody: {error: forbidden, error_description: "The token cannot read issue link types."}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role, which must stop on the refusal
+      block:
+        - name: Include the link_types role
+          ansible.builtin.include_role:
+            name: link_types
+          vars:
+            link_types_declared:
+              - name: Part
+                source_to_target: Part of
+                target_to_source: Part of
+                aggregation: true
+        - name: Fail when the refusal was not reported
+          ansible.builtin.fail:
+            msg: The role did not stop on an HTTP error.
+      rescue:
+        - name: Confirm the status and the server text are shown and the key is not
+          ansible.builtin.assert:
+            that:
+              - "'failed with HTTP status 403' in ansible_failed_result.msg"
+              - "'The token cannot read issue link types.' in ansible_failed_result.msg"
+              - "youtrack_api_key not in ansible_failed_result.msg"
+            fail_msg: "The HTTP error message is not the expected one."
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert one read and no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - stub_reads | length == 1
+        fail_msg: "The HTTP error case sent unexpected requests."
+
+- name: Case link_types - a list longer than the read limit stops the run before any write
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for three stored link types with a read limit of two
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+                - id: "20-2"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "2"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-3"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the link_types role, which must stop when the list is longer than the limit
+      block:
+        - name: Include the link_types role
+          ansible.builtin.include_role:
+            name: link_types
+          vars:
+            link_types_page_size: 2
+            link_types_read_limit: 2
+            link_types_declared:
+              - name: Part
+                source_to_target: Part of
+                target_to_source: Part of
+                aggregation: true
+        - name: Fail when the truncated list was not reported
+          ansible.builtin.fail:
+            msg: The role acted on a list longer than the read limit.
+      rescue:
+        - name: Confirm the message says the run stopped on a partial list
+          ansible.builtin.assert:
+            that:
+              - "'has more than 2 entries' in ansible_failed_result.msg"
+              - "'The run stopped rather than act on a partial list.' in ansible_failed_result.msg"
+            fail_msg: "The truncation message is not the expected one."
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert two reads and no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+          - >-
+            (stub_reads | map(attribute='request.url') | map('regex_findall', '[0-9]+$')
+            | map('first') | list) == ['0', '2']
+        fail_msg: "The truncation case sent unexpected requests."

@@ -1,0 +1,12 @@
+---
+- name: Reset the stub server mappings and request journal
+  ansible.builtin.uri:
+    url: "{{ stub_url }}/__admin/reset"
+    method: POST
+    status_code: 200
+
+- name: Clear the request journal
+  ansible.builtin.uri:
+    url: "{{ stub_url }}/__admin/requests"
+    method: DELETE
+    status_code: 200
