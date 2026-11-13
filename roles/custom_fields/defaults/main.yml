@@ -1,0 +1,23 @@
+---
+custom_fields_path: /api/admin/customFieldSettings/customFields
+custom_fields_bundles_path: /api/admin/customFieldSettings/bundles
+custom_fields_projects_path: /api/admin/projects
+
+# Page size for the list requests. A list longer than this is not read.
+# shortcut: the server default page size is not confirmed for these endpoints, so $top is set explicitly.
+custom_fields_page_size: 1000
+
+# REST names for fields that take a bundle.
+# shortcut: StateBundleCustomFieldDefaults is assumed by analogy with EnumBundleCustomFieldDefaults.
+custom_fields_bundle_types:
+  enum:
+    bundle_type: EnumBundle
+    defaults_type: EnumBundleCustomFieldDefaults
+    project_type: EnumProjectCustomField
+  state:
+    bundle_type: StateBundle
+    defaults_type: StateBundleCustomFieldDefaults
+    project_type: StateProjectCustomField
+
+# Project attachment type for a field that takes no bundle.
+custom_fields_simple_project_type: SimpleProjectCustomField

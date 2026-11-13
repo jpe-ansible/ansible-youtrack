@@ -1,0 +1,98 @@
+---
+- name: Set the kind of the custom field
+  ansible.builtin.set_fact:
+    custom_fields_kind: >-
+      {{ custom_fields_item.field_type.split('[')[0] if '[' in custom_fields_item.field_type else 'simple' }}
+
+- name: Check that a bundle-backed field declares its bundle
+  ansible.builtin.assert:
+    that:
+      - custom_fields_kind == 'simple' or custom_fields_item.bundle is defined
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }} and needs a bundle.
+
+- name: Find the current custom field
+  ansible.builtin.set_fact:
+    custom_fields_now: >-
+      {{ custom_fields_reads['fields'] | selectattr('name', 'equalto', custom_fields_item.name) | list
+         | first | default({}) }}
+
+- name: Stop when the custom field exists with another type
+  ansible.builtin.fail:
+    msg: >-
+      Custom field {{ custom_fields_item.name }} exists with type
+      {{ (custom_fields_now.fieldType | default({})).id | default('unknown') }}, not
+      {{ custom_fields_item.field_type }}. This role does not change a field type.
+  when:
+    - custom_fields_now.id is defined
+    - (custom_fields_now.fieldType | default({})).id | default('') != custom_fields_item.field_type
+
+- name: Find the default bundle of the custom field
+  ansible.builtin.set_fact:
+    custom_fields_bundle_id: "{{ custom_fields_bundle_map.get(custom_fields_item.bundle, '') }}"
+  when: custom_fields_kind in custom_fields_bundle_types
+  vars:
+    custom_fields_bundle_map: >-
+      {{ custom_fields_reads[custom_fields_kind ~ '_bundles'] | items2dict(key_name='name', value_name='id') }}
+
+- name: Stop when the bundle of the custom field does not exist
+  ansible.builtin.fail:
+    msg: >-
+      Bundle {{ custom_fields_item.bundle }} for custom field {{ custom_fields_item.name }} was not found.
+      Ensure it with the bundles role first.
+  when:
+    - custom_fields_kind in custom_fields_bundle_types
+    - custom_fields_bundle_id == ''
+
+- name: Set the type names of the custom field
+  ansible.builtin.set_fact:
+    custom_fields_type_names: "{{ custom_fields_bundle_types.get(custom_fields_kind, {}) }}"
+
+- name: Set the project attachment type of the custom field
+  ansible.builtin.set_fact:
+    custom_fields_project_type: >-
+      {{ custom_fields_type_names.get('project_type', custom_fields_simple_project_type) }}
+
+# shortcut: the defaults body for a state field is assumed by analogy with the enum body. Not confirmed.
+- name: Create the custom field when it is missing
+  when: custom_fields_now.id is not defined
+  block:
+    - name: Request the new custom field
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ custom_fields_path }}?fields=id,name"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body: >-
+          {{ {'name': custom_fields_item.name,
+              'fieldType': {'id': custom_fields_item.field_type},
+              'isAutoAttached': false}
+             | combine({'fieldDefaults': {'bundle': {'id': custom_fields_bundle_id,
+                                                     '$type': custom_fields_type_names.bundle_type},
+                                          '$type': custom_fields_type_names.defaults_type}}
+                       if custom_fields_kind in custom_fields_bundle_types else {}) }}
+        status_code: [200, 201]
+        validate_certs: "{{ custom_fields_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: custom_fields_created
+  rescue:
+    - name: Stop when the custom field cannot be created
+      ansible.builtin.fail:
+        msg: >-
+          Creating custom field {{ custom_fields_item.name }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Use the created custom field
+  ansible.builtin.set_fact:
+    custom_fields_now: "{{ custom_fields_created.json }}"
+  when: custom_fields_created.json is defined
+
+- name: Attach the custom field to its projects
+  ansible.builtin.include_tasks: attach.yml
+  loop: "{{ custom_fields_item.projects | default([]) }}"
+  loop_control:
+    loop_var: custom_fields_project
+    label: "{{ custom_fields_item.name }} in {{ custom_fields_project }}"
