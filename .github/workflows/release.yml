@@ -7,13 +7,20 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled, closed]
 
+# Release runs on one ref wait for each other, so two release-please runs never race.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
 jobs:
   release:
-    uses: JacobPEvans/.github/.github/workflows/_release.yml@v1
     permissions:
       contents: write
       pull-requests: write
       statuses: write
       checks: read
+    uses: JacobPEvans/.github/.github/workflows/_release.yml@v1
     secrets:
       GH_ACTION_RELEASE_PLEASE_PRIVATE_KEY: ${{ secrets.GH_ACTION_RELEASE_PLEASE_PRIVATE_KEY }}
