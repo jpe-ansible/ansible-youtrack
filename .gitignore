@@ -1,0 +1,10 @@
+.worktrees/
+.direnv/
+.venv/
+.ansible/
+.molecule/
+__pycache__/
+*.pyc
+*.tar.gz
+.DS_Store
+.ansible-run-logs/

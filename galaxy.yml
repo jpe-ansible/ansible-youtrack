@@ -1,0 +1,39 @@
+---
+namespace: jpe_ansible
+name: youtrack
+version: 0.1.0  # x-release-please-version
+readme: README.md
+authors:
+  - jpe-ansible
+description: >-
+  Roles that make JetBrains YouTrack enum and state bundles, global custom fields
+  and issue link types match a declared configuration.
+license:
+  - Apache-2.0
+dependencies: {}
+tags:
+  - application
+  - infrastructure
+  - tools
+repository: https://github.com/jpe-ansible/ansible-youtrack
+issues: https://github.com/jpe-ansible/ansible-youtrack/issues
+build_ignore:
+  - "*.tar.gz"
+  - .DS_Store
+  - .worktrees
+  - .direnv
+  - .github
+  - .envrc
+  - .ansible
+  - .ansible-lint
+  - .yamllint
+  - .markdownlint-cli2.yaml
+  - .pre-commit-config.yaml
+  - .readme-validator.yaml
+  - .release-please-manifest.json
+  - release-please-config.json
+  - renovate.json
+  - flake.nix
+  - flake.lock
+  - molecule
+  - requirements-test.txt
