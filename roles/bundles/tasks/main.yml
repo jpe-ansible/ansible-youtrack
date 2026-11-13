@@ -1,0 +1,18 @@
+---
+- name: Set the certificate check for the bundle requests
+  ansible.builtin.set_fact:
+    bundles_validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+
+- name: Ensure the enum bundles match the declared bundles
+  ansible.builtin.include_tasks: kind.yml
+  when: youtrack_enum_bundles | default([]) | length > 0
+  vars:
+    bundles_kind: enum
+    bundles_declared: "{{ youtrack_enum_bundles | default([]) }}"
+
+- name: Ensure the state bundles match the declared bundles
+  ansible.builtin.include_tasks: kind.yml
+  when: youtrack_state_bundles | default([]) | length > 0
+  vars:
+    bundles_kind: state
+    bundles_declared: "{{ youtrack_state_bundles | default([]) }}"

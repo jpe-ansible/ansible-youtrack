@@ -1,0 +1,32 @@
+---
+- name: Set the list fields for the bundles of this kind
+  ansible.builtin.set_fact:
+    bundles_list_fields: "id,name,values({{ bundles_kinds[bundles_kind].value_fields }})"
+
+- name: Read the current bundles of this kind
+  block:
+    - name: Request the bundles of this kind
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields={{ bundles_list_fields }}\
+          &$top={{ bundles_page_size }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ bundles_validate_certs }}"
+      check_mode: false
+      no_log: true
+      register: bundles_before
+  rescue:
+    - name: Stop when the bundles cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading the {{ bundles_kind }} bundles failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Ensure each declared bundle of this kind exists with its values
+  ansible.builtin.include_tasks: bundle.yml
+  loop: "{{ bundles_declared }}"
+  loop_control:
+    loop_var: bundles_item
+    label: "{{ bundles_kind }} bundle {{ bundles_item.name }}"

@@ -1,0 +1,83 @@
+---
+- name: Find the current value
+  ansible.builtin.set_fact:
+    bundles_value_now: >-
+      {{ bundles_now.get('values', []) | selectattr('name', 'equalto', bundles_value.name) | list | first
+         | default({}) }}
+
+# shortcut: the add body carries the name, the element type and, for state values, isResolved. The isResolved field
+# on add is assumed from the state element shape and is not confirmed.
+- name: Add the missing value
+  when:
+    - bundles_now.id is defined
+    - bundles_value_now.id is not defined
+  block:
+    - name: Request the new value
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}/{{ bundles_now.id }}/values\
+          ?fields={{ bundles_kinds[bundles_kind].value_fields }}"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body: >-
+          {{ {'name': bundles_value.name, '$type': bundles_kinds[bundles_kind].element_type}
+             | combine({'isResolved': bundles_value.is_resolved} if bundles_kind == 'state' else {}) }}
+        status_code: [200, 201]
+        validate_certs: "{{ bundles_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: bundles_value_added
+  rescue:
+    - name: Stop when the value cannot be added
+      ansible.builtin.fail:
+        msg: >-
+          Adding value {{ bundles_value.name }} to the {{ bundles_kind }} bundle {{ bundles_item.name }}
+          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Choose the stored copy of the value
+  ansible.builtin.set_fact:
+    bundles_value_target: >-
+      {{ bundles_value_added.json if bundles_value_added.json is defined else bundles_value_now }}
+
+# shortcut: the update body is partial. It sends only the declared attributes, plus isResolved for state values.
+# A partial update on this endpoint and isResolved on update are assumed, not confirmed.
+- name: Update the value when a declared attribute differs
+  when:
+    - bundles_now.id is defined
+    - bundles_value_target.id is defined
+    - >-
+      (bundles_value.description is defined
+        and (bundles_value.description | string) != (bundles_value_target.description | default('') | string))
+      or (bundles_value.color_id is defined
+        and (bundles_value.color_id | string)
+        != ((bundles_value_target.color | default({})).id | default('') | string))
+      or (bundles_kind == 'state'
+        and bundles_value.is_resolved != (bundles_value_target.isResolved | default(false)))
+  block:
+    - name: Request the value update
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}/{{ bundles_now.id }}/values\
+          /{{ bundles_value_target.id }}?fields=id"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body: >-
+          {{ {'name': bundles_value.name}
+             | combine({'description': bundles_value.description} if bundles_value.description is defined else {})
+             | combine({'color': {'id': bundles_value.color_id}} if bundles_value.color_id is defined else {})
+             | combine({'isResolved': bundles_value.is_resolved} if bundles_kind == 'state' else {}) }}
+        status_code: [200, 201]
+        validate_certs: "{{ bundles_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: bundles_value_updated
+  rescue:
+    - name: Stop when the value cannot be updated
+      ansible.builtin.fail:
+        msg: >-
+          Updating value {{ bundles_value.name }} in the {{ bundles_kind }} bundle {{ bundles_item.name }}
+          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.

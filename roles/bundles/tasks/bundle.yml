@@ -1,0 +1,45 @@
+---
+- name: Find the current bundle
+  ansible.builtin.set_fact:
+    bundles_now: >-
+      {{ bundles_before.json | selectattr('name', 'equalto', bundles_item.name) | list | first | default({}) }}
+
+# shortcut: the bundle is created empty. Its values are added one at a time by value.yml, which uses the known value
+# request shape. Accepting an empty values list on bundle create is not confirmed.
+- name: Create the bundle when it is missing
+  when: bundles_now.id is not defined
+  block:
+    - name: Request the new bundle
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields=id,name"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          name: "{{ bundles_item.name }}"
+          $type: "{{ bundles_kinds[bundles_kind].bundle_type }}"
+        status_code: [200, 201]
+        validate_certs: "{{ bundles_validate_certs }}"
+      changed_when: true
+      no_log: true
+      register: bundles_created
+  rescue:
+    - name: Stop when the bundle cannot be created
+      ansible.builtin.fail:
+        msg: >-
+          Creating the {{ bundles_kind }} bundle {{ bundles_item.name }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Use the created bundle
+  ansible.builtin.set_fact:
+    bundles_now: "{{ bundles_created.json }}"
+  when: bundles_created.json is defined
+
+- name: Ensure each declared value of the bundle exists
+  ansible.builtin.include_tasks: value.yml
+  loop: "{{ bundles_item['values'] }}"
+  loop_control:
+    loop_var: bundles_value
+    label: "{{ bundles_value.name }}"

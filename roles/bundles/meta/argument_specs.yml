@@ -1,0 +1,70 @@
+---
+argument_specs:
+  main:
+    short_description: Ensure YouTrack enum and state bundles exist with the declared values.
+    options:
+      youtrack_url:
+        type: str
+        required: true
+        description: Base URL of the YouTrack server, without a trailing slash.
+      youtrack_api_key:
+        type: str
+        required: true
+        no_log: true
+        description: API token sent as a bearer token on every request.
+      youtrack_validate_certs:
+        type: bool
+        required: false
+        description: Verify the server certificate. Defaults to true.
+      youtrack_enum_bundles:
+        type: list
+        elements: dict
+        required: false
+        description: Enum bundles to ensure. Missing bundles and values are added. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Other values are left as they are.
+            options:
+              name:
+                type: str
+                required: true
+              color_id:
+                type: str
+                required: false
+                description: Color identifier of the value. Left as it is when omitted.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.
+      youtrack_state_bundles:
+        type: list
+        elements: dict
+        required: false
+        description: State bundles to ensure. Missing bundles and values are added. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Other values are left as they are.
+            options:
+              name:
+                type: str
+                required: true
+              is_resolved:
+                type: bool
+                required: true
+                description: Whether an issue in this state counts as resolved.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.

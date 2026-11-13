@@ -1,0 +1,18 @@
+---
+bundles_path: /api/admin/customFieldSettings/bundles
+
+# Page size for the list request. A list longer than this is not read.
+# shortcut: the server default page size is not confirmed for these endpoints, so $top is set explicitly.
+bundles_page_size: 1000
+
+# REST names for each bundle kind.
+# shortcut: the state type names StateBundle and StateBundleElement are assumed by analogy with the enum names.
+bundles_kinds:
+  enum:
+    bundle_type: EnumBundle
+    element_type: EnumBundleElement
+    value_fields: "id,name,ordinal,description,color(id)"
+  state:
+    bundle_type: StateBundle
+    element_type: StateBundleElement
+    value_fields: "id,name,ordinal,description,isResolved"
