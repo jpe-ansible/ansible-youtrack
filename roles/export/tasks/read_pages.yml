@@ -30,7 +30,6 @@
         msg: >-
           Reading {{ export_pages_what }} failed with HTTP status
           {{ ansible_failed_result.status | default('unknown') }}.
-          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
 - name: Keep the status of a list the server refuses
   ansible.builtin.set_fact:

@@ -23,7 +23,6 @@
         msg: >-
           Reading {{ export_one_what }} failed with HTTP status
           {{ ansible_failed_result.status | default('unknown') }}.
-          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
 - name: Keep the object or the status it was refused with
   ansible.builtin.set_fact:
