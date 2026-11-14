@@ -1,0 +1,123 @@
+---
+# Entries requested per page. Pages are read until one comes back empty, so a longer list is read in full.
+export_page_size: 100
+
+# Most entries that one list read may return. A list that reaches this limit stops the run instead of being cut short.
+export_read_limit: 10000
+
+# Sections read by default: every section in the two tables below.
+export_sections: "{{ (export_table + export_child_table) | map(attribute='name') | list }}"
+
+# Sections that read one endpoint each. kind is list for a paged list, or single for one object.
+# path is the REST path under the server URL. fields is the attribute list sent with the fields parameter.
+export_table:
+  - name: issue_link_types
+    kind: list
+    path: /api/issueLinkTypes
+    fields: id,name,sourceToTarget,targetToSource,directed,aggregation,readOnly
+  - name: custom_field_prototypes
+    kind: list
+    path: /api/admin/customFieldSettings/customFields
+    fields: id,name,fieldType(id),isAutoAttached,isDisplayedInIssueList,isPublic,aliases,localizedName,ordinal
+  - name: bundles_enum
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/enum
+    fields: "id,name,values(id,name,description,archived,ordinal,color(id),localizedName)"
+  - name: bundles_state
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/state
+    fields: "id,name,values(id,name,isResolved,description,archived,ordinal,color(id))"
+  - name: bundles_owned
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/ownedField
+    fields: "id,name,values(id,name,owner(login),description,archived,ordinal,color(id))"
+  - name: bundles_version
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/version
+    fields: "id,name,values(id,name,releaseDate,startDate,released,archived,description,ordinal,color(id))"
+  - name: bundles_build
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/build
+    fields: "id,name,values(id,name,assembleDate,description,archived,ordinal,color(id))"
+  - name: bundles_user
+    kind: list
+    path: /api/admin/customFieldSettings/bundles/user
+    fields: "id,name,groups(id,name),individuals(id,login),aggregatedUsers(id,login)"
+  - name: projects
+    kind: list
+    path: /api/admin/projects
+    fields: id,shortName,name,archived,leader(login),template
+  - name: agile_boards
+    kind: list
+    path: /api/agiles
+    fields: "id,name,owner(login),projects(id,shortName),orphansAtTheTop,hideOrphansSwimlane,\
+      estimationField(id,name),originalEstimationField(id,name),readSharingSettings,updateSharingSettings,\
+      swimlaneSettings,colorCoding,columnSettings,sprintsSettings"
+  - name: tags
+    kind: list
+    path: /api/tags
+    fields: "id,name,color(id),untagOnResolve,owner(login),readSharingSettings,updateSharingSettings,tagSharingSettings"
+  - name: saved_queries
+    kind: list
+    path: /api/savedQueries
+    fields: "id,name,query,owner(login),readSharingSettings,updateSharingSettings"
+  - name: work_item_types
+    kind: list
+    path: /api/admin/timeTrackingSettings/workItemTypes
+    fields: id,name,autoAttached
+  - name: work_time_settings
+    kind: single
+    path: /api/admin/timeTrackingSettings/workTimeSettings
+    fields: minutesADay,workDays,firstDayOfWeek,daysAWeek
+  - name: roles
+    kind: list
+    path: /api/roles
+    fields: "id,name,description,permissions(id,name)"
+  - name: groups
+    kind: list
+    path: /api/groups
+    fields: "id,name,autoJoin,autoJoinDomain,requireTwoFactorAuthentication,viewers(id,name),updaters(id,name)"
+  - name: users
+    kind: list
+    path: /api/users
+    fields: id,login,name,banned
+  - name: appearance_settings
+    kind: single
+    path: /api/admin/globalSettings/appearanceSettings
+    fields: "timeZone(id,name),dateFieldFormat(id,name)"
+  - name: locale_settings
+    kind: single
+    path: /api/admin/globalSettings/localeSettings
+    fields: "locale(id,name),isRTL"
+  - name: system_settings
+    kind: single
+    path: /api/admin/globalSettings/systemSettings
+    fields: baseUrl,maxUploadFileSize,maxExportItems,allowStatisticsCollection,isApplicationReadOnly
+  - name: rest_settings
+    kind: single
+    path: /api/admin/globalSettings/restSettings
+    fields: allowedOrigins,allowAllOrigins
+
+# Sections read once for each entry of a parent section. The path holds {id}, which is replaced by the entry's id.
+# A parent section must be selected together with each child section.
+export_child_table:
+  - name: custom_field_defaults
+    parent: custom_field_prototypes
+    kind: single
+    path: /api/admin/customFieldSettings/customFields/{id}/fieldDefaults
+    fields: "$type,canBeEmpty,emptyFieldText,isPublic,bundle(id,name),defaultValues(id,name)"
+  - name: project_custom_fields
+    parent: projects
+    kind: list
+    path: /api/admin/projects/{id}/customFields
+    fields: "$type,id,field(id,name),canBeEmpty,emptyFieldText,ordinal,isPublic,bundle(id,name),defaultValues(id,name)"
+  - name: project_time_tracking
+    parent: projects
+    kind: single
+    path: /api/admin/projects/{id}/timeTrackingSettings
+    fields: "enabled,estimate(id,name),timeSpent(id,name),workItemTypes(id,name)"
+  - name: board_sprints
+    parent: agile_boards
+    kind: list
+    path: /api/agiles/{id}/sprints
+    fields: id,name,goal,start,finish,archived,isDefault

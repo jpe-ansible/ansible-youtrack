@@ -1,0 +1,36 @@
+---
+- name: Stop when a selected section is not one the role reads
+  ansible.builtin.assert:
+    that:
+      - export_sections | difference((export_table + export_child_table) | map(attribute='name') | list) | length == 0
+    fail_msg: "An export section name is not one of the sections listed in the role README."
+
+- name: Stop when a child section is selected without its parent section
+  ansible.builtin.assert:
+    that:
+      - >-
+        export_child_table | selectattr('name', 'in', export_sections) | map(attribute='parent') | list
+        | difference(export_sections) | length == 0
+    fail_msg: "A child section reads one entry of its parent section, so the parent section must be selected too."
+
+- name: Start an empty export
+  ansible.builtin.set_fact:
+    export_data: {}
+    export_meta_sections: []
+
+- name: Read each selected section
+  ansible.builtin.include_tasks: section.yml
+  loop: "{{ export_table | selectattr('name', 'in', export_sections) | list }}"
+  loop_control:
+    loop_var: export_section
+    label: "{{ export_section.name }}"
+
+- name: Read each selected child section
+  ansible.builtin.include_tasks: child_section.yml
+  loop: "{{ export_child_table | selectattr('name', 'in', export_sections) | list }}"
+  loop_control:
+    loop_var: export_child_section
+    label: "{{ export_child_section.name }}"
+
+- name: Write the export file
+  ansible.builtin.include_tasks: write.yml

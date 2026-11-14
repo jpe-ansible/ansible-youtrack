@@ -1,0 +1,10 @@
+---
+- name: Export the YouTrack configuration
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars/youtrack.yml
+  vars:
+    export_dest: youtrack-config.json
+  roles:
+    - jpe_ansible.youtrack.export

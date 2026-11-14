@@ -1,0 +1,73 @@
+---
+# Reads one page of a list, then the next page, until a page comes back empty.
+# The complete list is left in export_value. A list the server refuses with 403 or 404 is left as {"error": status}.
+# Inputs: export_pages_url, export_pages_what, export_pages_skip and export_pages_rows.
+- name: Stop when the list is longer than the read limit
+  ansible.builtin.fail:
+    msg: >-
+      The list of {{ export_pages_what }} has more than {{ export_read_limit }} entries.
+      The run stopped rather than write a partial list.
+  when: export_pages_skip | int > export_read_limit | int
+
+- name: Read one page of the list
+  block:
+    - name: Request the page
+      ansible.builtin.uri:
+        url: "{{ export_pages_url }}&$top={{ export_page_size }}&$skip={{ export_pages_skip }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        status_code: [200, 403, 404]
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: export_pages_response
+  rescue:
+    - name: Stop when the page cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading {{ export_pages_what }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Keep the status of a list the server refuses
+  ansible.builtin.set_fact:
+    export_value: "{{ {'error': export_pages_response.status} }}"
+  when: export_pages_response.status != 200
+  no_log: true
+
+- name: Stop when the server does not return a list
+  ansible.builtin.assert:
+    that:
+      - export_pages_response.json is sequence
+      - export_pages_response.json is not mapping
+    fail_msg: "Reading {{ export_pages_what }} returned a response that is not a list."
+  when: export_pages_response.status == 200
+
+- name: Keep the complete list when the page is empty
+  ansible.builtin.set_fact:
+    export_value: "{{ export_pages_rows }}"
+  when:
+    - export_pages_response.status == 200
+    - export_pages_response.json | length == 0
+  no_log: true
+
+# The next page gets its own names. Passing export_pages_rows to itself would make the template refer to itself.
+- name: Keep the rows and offset for the next page
+  ansible.builtin.set_fact:
+    export_pages_next_rows: "{{ export_pages_rows + export_pages_response.json }}"
+    export_pages_next_skip: "{{ export_pages_skip | int + export_pages_response.json | length }}"
+  when:
+    - export_pages_response.status == 200
+    - export_pages_response.json | length > 0
+  no_log: true
+
+- name: Read the next page
+  ansible.builtin.include_tasks: read_pages.yml
+  when:
+    - export_pages_response.status == 200
+    - export_pages_response.json | length > 0
+  vars:
+    export_pages_rows: "{{ export_pages_next_rows }}"
+    export_pages_skip: "{{ export_pages_next_skip }}"

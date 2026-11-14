@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.2.1...v0.3.0) (2026-11-14)
+
+
+### Features
+
+* **export:** add a role that reads the server configuration into a file ([#14](https://github.com/jpe-ansible/ansible-youtrack/issues/14)) ([72c8f37](https://github.com/jpe-ansible/ansible-youtrack/commit/72c8f375044d21472cc0f7ec8df21e52c92aaf4e))
+
 ## [0.2.1](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.2.0...v0.2.1) (2026-11-14)
 
 

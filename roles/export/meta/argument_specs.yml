@@ -1,0 +1,31 @@
+---
+argument_specs:
+  main:
+    short_description: Export the configuration of a YouTrack server to one local JSON file.
+    options:
+      youtrack_url:
+        type: str
+        required: true
+        description: Base URL of the YouTrack server, for example https://youtrack.example.com. No trailing slash.
+      youtrack_api_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          Permanent token of a user who can read the administration settings. Sent as a bearer token and never logged.
+      youtrack_validate_certs:
+        type: bool
+        required: false
+        default: true
+        description: Verify the server certificate. Set to false only for a test server with a self-signed certificate.
+      export_dest:
+        type: path
+        required: true
+        description: Path of the JSON file to write. The file is written with mode 0600.
+      export_sections:
+        type: list
+        elements: str
+        required: false
+        description: >-
+          Names of the sections to read. The default reads every section listed in the role README. A child section
+          needs its parent section in the list.
