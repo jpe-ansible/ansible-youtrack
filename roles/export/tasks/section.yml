@@ -1,0 +1,29 @@
+---
+# Reads one top-level section and keeps it in export_data. Input: export_section.
+- name: Read every page of the section
+  ansible.builtin.include_tasks: read_pages.yml
+  when: export_section.kind == 'list'
+  vars:
+    export_pages_url: "{{ youtrack_url }}{{ export_section.path }}?fields={{ export_section.fields }}"
+    export_pages_what: "{{ export_section.name }}"
+    export_pages_skip: 0
+    export_pages_rows: []
+
+- name: Read the object of the section
+  ansible.builtin.include_tasks: read_one.yml
+  when: export_section.kind == 'single'
+  vars:
+    export_one_url: "{{ youtrack_url }}{{ export_section.path }}?fields={{ export_section.fields }}"
+    export_one_what: "{{ export_section.name }}"
+
+- name: Record the section in the export metadata
+  ansible.builtin.set_fact:
+    export_meta_sections: >-
+      {{ export_meta_sections + [{'name': export_section.name, 'error': export_value.error}
+      if export_value.error is defined
+      else {'name': export_section.name, 'count': export_value | length if export_section.kind == 'list' else 1}] }}
+
+- name: Keep the section in the export
+  ansible.builtin.set_fact:
+    export_data: "{{ export_data | combine({export_section.name: export_value}) }}"
+  no_log: true

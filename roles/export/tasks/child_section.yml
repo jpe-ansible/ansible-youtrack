@@ -1,0 +1,23 @@
+---
+# Reads one child section for every entry of its parent section. Input: export_child_section.
+- name: Start the entries of the child section
+  ansible.builtin.set_fact:
+    export_data: "{{ export_data | combine({export_child_section.name: {}}) }}"
+
+# A parent section the server refused has no entries, so its child section stays empty.
+- name: Read the child section for each entry of its parent section
+  ansible.builtin.include_tasks: child_entry.yml
+  loop: "{{ [] if export_data[export_child_section.parent] is mapping else export_data[export_child_section.parent] }}"
+  loop_control:
+    loop_var: export_parent
+    label: "{{ export_parent.id }}"
+
+- name: Record the item count of the child section in the export metadata
+  ansible.builtin.set_fact:
+    export_meta_sections: >-
+      {{ export_meta_sections + [{'name': export_child_section.name, 'count': (
+        export_data[export_child_section.name].values() | rejectattr('error', 'defined') | list | length
+        if export_child_section.kind == 'single'
+        else export_data[export_child_section.name].values() | reject('mapping') | map('length') | sum
+      )}] }}
+  no_log: true

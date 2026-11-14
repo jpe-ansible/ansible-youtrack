@@ -1,0 +1,33 @@
+---
+# Reads one object. The object is left in export_value. An object the server refuses with 403 or 404 is left as
+# {"error": status}.
+# Inputs: export_one_url and export_one_what.
+- name: Read the object
+  block:
+    - name: Request the object
+      ansible.builtin.uri:
+        url: "{{ export_one_url }}"
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        status_code: [200, 403, 404]
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: export_one_response
+  rescue:
+    - name: Stop when the object cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading {{ export_one_what }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
+
+- name: Keep the object or the status it was refused with
+  ansible.builtin.set_fact:
+    export_value: >-
+      {{ export_one_response.json if export_one_response.status == 200
+      else {'error': export_one_response.status} }}
+  no_log: true

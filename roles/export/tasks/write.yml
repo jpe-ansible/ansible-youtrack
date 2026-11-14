@@ -1,0 +1,49 @@
+---
+# Writes export_data and the export metadata to export_dest. The timestamp is kept from the earlier file when the
+# sections and the server match it, so a run with the same data writes the same bytes and reports no change.
+- name: Look for the file of an earlier export
+  ansible.builtin.stat:
+    path: "{{ export_dest }}"
+  register: export_stat
+
+- name: Read the file of an earlier export
+  ansible.builtin.slurp:
+    src: "{{ export_dest }}"
+  when: export_stat.stat.exists
+  no_log: true
+  register: export_slurp
+
+- name: Parse the file of an earlier export
+  ansible.builtin.set_fact:
+    export_previous: "{{ export_slurp.content | b64decode | from_json }}"
+  when: export_stat.stat.exists
+  no_log: true
+
+- name: Stamp the export with the time of this run
+  ansible.builtin.set_fact:
+    export_exported_at: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+
+- name: Keep the timestamp of the earlier file when the export has the same content
+  ansible.builtin.set_fact:
+    export_exported_at: "{{ export_previous.meta.exported_at }}"
+  when:
+    - export_stat.stat.exists
+    - export_previous.meta.server == youtrack_url
+    - export_previous.meta.sections == export_meta_sections
+    - export_previous | dict2items | rejectattr('key', 'equalto', 'meta') | items2dict == export_data
+  no_log: true
+
+- name: Assemble the export document
+  ansible.builtin.set_fact:
+    export_document: >-
+      {{ export_data | combine({'meta': {'server': youtrack_url, 'exported_at': export_exported_at,
+      'sections': export_meta_sections}}) }}
+  no_log: true
+
+# The copy module compares the content with the file, so check mode reports the write without making it.
+- name: Write the export file
+  ansible.builtin.copy:
+    content: "{{ export_document | to_nice_json(indent=2) }}\n"
+    dest: "{{ export_dest }}"
+    mode: "0600"
+  no_log: true
