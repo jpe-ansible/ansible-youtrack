@@ -15,3 +15,5 @@
       ansible.builtin.include_tasks: cases/custom_fields.yml
     - name: Run the link_types cases
       ansible.builtin.include_tasks: cases/link_types.yml
+    - name: Run the export cases
+      ansible.builtin.include_tasks: cases/export.yml
