@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.2.0...v0.2.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **galaxy:** keep local and repository-only files out of the build ([#11](https://github.com/jpe-ansible/ansible-youtrack/issues/11)) ([7893af6](https://github.com/jpe-ansible/ansible-youtrack/commit/7893af6bf5e4ddca8bc532a9ece3e1d5f7b762c0))
+
 ## [0.2.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.1.0...v0.2.0) (2026-11-14)
 
 
