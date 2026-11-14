@@ -1,0 +1,13 @@
+---
+# Run with ansible-playbook by a test case. The destination, sections and page size come in as extra variables, so a
+# case can run the role as its own play and read the play recap.
+- name: Export role run from a test case
+  hosts: localhost
+  gather_facts: false
+  vars:
+    youtrack_url: "{{ lookup('ansible.builtin.env', 'YTC_TEST_URL') }}"
+    youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KEY') }}"
+  tasks:
+    - name: Run the export role
+      ansible.builtin.include_role:
+        name: export

@@ -1,0 +1,26 @@
+---
+# Reads the child section for one entry of its parent section. Inputs: export_child_section and export_parent.
+- name: Read every page of the child section for the entry
+  ansible.builtin.include_tasks: read_pages.yml
+  when: export_child_section.kind == 'list'
+  vars:
+    export_pages_url: "{{ youtrack_url }}{{ export_child_section.path | replace('{id}', export_parent.id) }}\
+      ?fields={{ export_child_section.fields }}"
+    export_pages_what: "{{ export_child_section.name }} of {{ export_parent.id }}"
+    export_pages_skip: 0
+    export_pages_rows: []
+
+- name: Read the object of the child section for the entry
+  ansible.builtin.include_tasks: read_one.yml
+  when: export_child_section.kind == 'single'
+  vars:
+    export_one_url: "{{ youtrack_url }}{{ export_child_section.path | replace('{id}', export_parent.id) }}\
+      ?fields={{ export_child_section.fields }}"
+    export_one_what: "{{ export_child_section.name }} of {{ export_parent.id }}"
+
+- name: Keep the entry read for its parent
+  ansible.builtin.set_fact:
+    export_data: >-
+      {{ export_data | combine({export_child_section.name:
+      export_data[export_child_section.name] | combine({export_parent.id: export_value})}) }}
+  no_log: true

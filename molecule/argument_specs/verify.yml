@@ -1,5 +1,5 @@
 ---
-- name: Verify the argument specs of the bundles, custom_fields and link_types roles
+- name: Verify the argument specs of the bundles, custom_fields, link_types and export roles
   hosts: all
   gather_facts: false
   vars:
@@ -7,6 +7,7 @@
       bundles: "{{ argspec_bundles.argument_specs.main.options }}"
       custom_fields: "{{ argspec_custom_fields.argument_specs.main.options }}"
       link_types: "{{ argspec_link_types.argument_specs.main.options }}"
+      export: "{{ argspec_export.argument_specs.main.options }}"
     argspec_connection:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: example-token
@@ -89,6 +90,31 @@
         provided: >-
           {{ argspec_connection | combine({'link_types_declared': [{'name': 'Part',
             'source_to_target': 'Part of'}]}) }}
+      - name: export accepts a connection with a destination and sections
+        role: export
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'export_dest': 'youtrack-config.json',
+            'export_sections': ['issue_link_types']}) }}
+      - name: export rejects a missing destination
+        role: export
+        expect: fail
+        error: "missing required arguments: export_dest"
+        provided: "{{ argspec_connection }}"
+      - name: export rejects a missing URL
+        role: export
+        expect: fail
+        error: "missing required arguments: youtrack_url"
+        provided:
+          youtrack_api_key: example-token
+          export_dest: youtrack-config.json
+      - name: export rejects a non-boolean certificate flag
+        role: export
+        expect: fail
+        error: "youtrack_validate_certs"
+        provided: >-
+          {{ argspec_connection | combine({'export_dest': 'youtrack-config.json',
+            'youtrack_validate_certs': 'sometimes'}) }}
 
   tasks:
     - name: Load the bundles argument spec
@@ -105,6 +131,11 @@
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../../roles/link_types/meta/argument_specs.yml"
         name: argspec_link_types
+
+    - name: Load the export argument spec
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../roles/export/meta/argument_specs.yml"
+        name: argspec_export
 
     - name: Check each argument spec case
       ansible.builtin.include_tasks: tasks/check_case.yml

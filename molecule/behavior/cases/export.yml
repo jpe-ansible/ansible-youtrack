@@ -1,0 +1,250 @@
+---
+- name: Case export - a run writes the selected sections, a list longer than one page and a project's entries
+  block:
+    - name: Create a directory for the export files
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: export
+      register: export_test_dir
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-1"
+                  name: Part
+                  sourceToTarget: Part of
+                  targetToSource: Part of
+                  directed: false
+                  aggregation: true
+                  readOnly: false
+                - id: "20-2"
+                  name: Relates
+                  sourceToTarget: Relates
+                  targetToSource: Relates
+                  directed: false
+                  aggregation: false
+                  readOnly: false
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "2"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "20-3"
+                  name: Other
+                  sourceToTarget: Other
+                  targetToSource: Other
+                  directed: true
+                  aggregation: false
+                  readOnly: false
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "3"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "0-1"
+                  shortName: DEMO
+                  name: Demo project
+                  archived: false
+                  leader: {login: example-admin}
+                  template: false
+          - request:
+              method: GET
+              urlPath: /api/admin/projects
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "60-1", $type: EnumProjectCustomField, field: {id: "58-1", name: Type}, canBeEmpty: false}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/timeTrackingSettings
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {enabled: true}}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the export role
+      ansible.builtin.include_role:
+        name: export
+      vars:
+        export_dest: "{{ export_test_dir.path }}/export.json"
+        export_sections: [issue_link_types, projects, project_custom_fields, project_time_tracking]
+        export_page_size: 2
+    - name: Read the export file
+      ansible.builtin.slurp:
+        src: "{{ export_test_dir.path }}/export.json"
+      register: stub_export_file
+      no_log: true
+    - name: Read the file as data
+      ansible.builtin.set_fact:
+        stub_export: "{{ stub_export_file.content | b64decode | from_json }}"
+      no_log: true
+    - name: Read the file mode
+      ansible.builtin.stat:
+        path: "{{ export_test_dir.path }}/export.json"
+      register: stub_export_stat
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the sections match the stub data and the file is private
+      ansible.builtin.assert:
+        that:
+          - stub_export.issue_link_types | map(attribute='name') | list == ['Part', 'Relates', 'Other']
+          - stub_export.projects[0].shortName == 'DEMO'
+          - stub_export.project_custom_fields['0-1'][0].field.name == 'Type'
+          - stub_export.project_time_tracking['0-1'].enabled
+          - stub_export.meta.server == stub_url
+          - >-
+            stub_export.meta.sections | map(attribute='name') | list
+            == ['issue_link_types', 'projects', 'project_custom_fields', 'project_time_tracking']
+          - stub_export.meta.sections | map(attribute='count') | list == [3, 1, 1, 1]
+          - stub_export_stat.stat.mode == '0600'
+          - youtrack_api_key not in (stub_export_file.content | b64decode)
+          - stub_writes | length == 0
+        fail_msg: "The export file does not match the stub data, is not private, or the run sent writes."
+    - name: Keep the export variables for the later runs
+      ansible.builtin.set_fact:
+        stub_export_vars:
+          export_dest: "{{ export_test_dir.path }}/export.json"
+          export_sections: [issue_link_types, projects, project_custom_fields, project_time_tracking]
+          export_page_size: 2
+
+- name: Case export - a second run with the same input changes nothing and writes nothing
+  block:
+    - name: Run the export role as a separate play
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - "{{ playbook_dir }}/run_export.yml"
+          - "--extra-vars"
+          - "{{ stub_export_vars | to_json }}"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: stub_second_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the recap reports no change and no write was sent
+      ansible.builtin.assert:
+        that:
+          - stub_second_run.stdout is search('changed=0([^0-9]|$)')
+          - "' failed=0 ' in stub_second_run.stdout"
+          - stub_writes | length == 0
+        fail_msg: "A second run with the same input reported a change or sent writes."
+
+- name: Case export - check mode writes no file and reports the write it would make
+  block:
+    - name: Run the export role in check mode as a separate play
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/run_export.yml"
+          - "--extra-vars"
+          - "{{ stub_export_vars | combine({'export_dest': export_test_dir.path ~ '/check.json'}) | to_json }}"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: stub_check_run
+    - name: Read the file that check mode would write
+      ansible.builtin.stat:
+        path: "{{ export_test_dir.path }}/check.json"
+      register: stub_check_stat
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert check mode reports one change, writes no file and sends only reads
+      ansible.builtin.assert:
+        that:
+          - stub_check_run.stdout is search('changed=1([^0-9]|$)')
+          - not stub_check_stat.stat.exists
+          - stub_writes | length == 0
+          - stub_journal_response.json.requests | map(attribute='request.method') | unique | list == ['GET']
+        fail_msg: >-
+          Check mode wrote a file, reported no change, or sent a request other than GET.
+          Recap: {{ stub_check_run.stdout | regex_search('changed=[0-9]+') }}.
+          File exists: {{ stub_check_stat.stat.exists }}. Writes: {{ stub_writes | length }}.
+
+- name: Case export - a section that answers 403 is recorded as an error and the run succeeds
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with a refused tags list
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/issueLinkTypes
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/tags
+            response: {status: 403, headers: "{{ stub_json }}", jsonBody: {error: Forbidden}}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the export role with a section the server refuses
+      ansible.builtin.include_role:
+        name: export
+      vars:
+        export_dest: "{{ export_test_dir.path }}/refused.json"
+        export_sections: [issue_link_types, tags]
+    - name: Read the export file
+      ansible.builtin.slurp:
+        src: "{{ export_test_dir.path }}/refused.json"
+      register: stub_refused_file
+      no_log: true
+    - name: Read the file as data
+      ansible.builtin.set_fact:
+        stub_refused: "{{ stub_refused_file.content | b64decode | from_json }}"
+      no_log: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the refused section is an error and every request was a GET
+      ansible.builtin.assert:
+        that:
+          - "stub_refused.tags == {'error': 403}"
+          - stub_refused.issue_link_types == []
+          - >-
+            stub_refused.meta.sections == [{'name': 'issue_link_types', 'count': 0},
+            {'name': 'tags', 'error': 403}]
+          - stub_writes | length == 0
+          - stub_journal_response.json.requests | map(attribute='request.method') | unique | list == ['GET']
+        fail_msg: "A refused section was not recorded as an error, or a request other than GET was sent."
+    - name: Remove the directory for the export files
+      ansible.builtin.file:
+        path: "{{ export_test_dir.path }}"
+        state: absent
