@@ -193,7 +193,10 @@
           - not stub_check_stat.stat.exists
           - stub_writes | length == 0
           - stub_journal_response.json.requests | map(attribute='request.method') | unique | list == ['GET']
-        fail_msg: "Check mode wrote a file, reported no change, or sent a request other than GET."
+        fail_msg: >-
+          Check mode wrote a file, reported no change, or sent a request other than GET.
+          Recap: {{ stub_check_run.stdout | regex_search('changed=[0-9]+') }}.
+          File exists: {{ stub_check_stat.stat.exists }}. Writes: {{ stub_writes | length }}.
 
 - name: Case export - a section that answers 403 is recorded as an error and the run succeeds
   block:
