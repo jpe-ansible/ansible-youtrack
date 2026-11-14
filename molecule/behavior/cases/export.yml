@@ -158,7 +158,7 @@
     - name: Assert the recap reports no change and no write was sent
       ansible.builtin.assert:
         that:
-          - "' changed=0 ' in stub_second_run.stdout"
+          - stub_second_run.stdout is search('changed=0([^0-9]|$)')
           - "' failed=0 ' in stub_second_run.stdout"
           - stub_writes | length == 0
         fail_msg: "A second run with the same input reported a change or sent writes."
@@ -189,7 +189,7 @@
     - name: Assert check mode reports one change, writes no file and sends only reads
       ansible.builtin.assert:
         that:
-          - "' changed=1 ' in stub_check_run.stdout"
+          - stub_check_run.stdout is search('changed=1([^0-9]|$)')
           - not stub_check_stat.stat.exists
           - stub_writes | length == 0
           - stub_journal_response.json.requests | map(attribute='request.method') | unique | list == ['GET']
