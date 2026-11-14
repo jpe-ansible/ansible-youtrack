@@ -30,7 +30,7 @@ repos:
         files: '\.(py|sh|rb)$'
 
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.3
+    rev: v0.24.1
     hooks:
       - id: markdownlint-cli2
 
