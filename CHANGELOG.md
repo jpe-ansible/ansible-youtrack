@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.3.0...v0.4.0) (2026-11-15)
+
+
+### Features
+
+* **custom_fields:** accept a bundle and can-be-empty setting per project ([#17](https://github.com/jpe-ansible/ansible-youtrack/issues/17)) ([a731e93](https://github.com/jpe-ansible/ansible-youtrack/commit/a731e939096c362f8bb028c89b77fd9e8e1edecb))
+
 ## [0.3.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.2.1...v0.3.0) (2026-11-14)
 
 
