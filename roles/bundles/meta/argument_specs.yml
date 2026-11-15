@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Ensure YouTrack enum, state, version, build and owned bundles exist with the declared values.
+    short_description: Ensure YouTrack enum, state, version, build, owned and user bundles exist with declared values.
     options:
       youtrack_url:
         type: str
@@ -169,6 +169,31 @@ argument_specs:
                 required: false
                 description: >-
                   Assembly date as epoch milliseconds in UTC, for example 1627636495000. Left as it is when omitted.
+      bundles_user:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          User bundles to ensure. A missing bundle is created, and a missing member is added. Members that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          users:
+            type: list
+            elements: str
+            required: false
+            description: >-
+              Logins of the users that the bundle must contain. Each login must name an existing user.
+          groups:
+            type: list
+            elements: str
+            required: false
+            description: >-
+              Names of the groups that the bundle must contain. Each name must name an existing group.
       bundles_owned:
         type: list
         elements: dict

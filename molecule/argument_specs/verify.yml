@@ -127,6 +127,32 @@
         error: "values found in bundles_owned"
         provided: >-
           {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners'}]}) }}
+      - name: bundles accepts a user bundle with users and groups
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams', 'users': ['jane.doe'],
+            'groups': ['Developers']}]}) }}
+      - name: bundles rejects a user bundle without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_user"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'users': ['jane.doe']}]}) }}
+      - name: bundles rejects values on a user bundle
+        role: bundles
+        expect: fail
+        error: "values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams',
+            'values': [{'name': 'x'}]}]}) }}
+      - name: bundles rejects a users entry that is a mapping and not a list
+        role: bundles
+        expect: fail
+        error: "users"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams',
+            'users': {'login': 'jane.doe'}}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

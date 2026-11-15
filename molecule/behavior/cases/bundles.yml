@@ -705,6 +705,274 @@
           - "'Would add value Core to the owned bundle Owners.' in run_kind_result.stdout"
         fail_msg: "Check mode sent writes or did not report the planned owned changes."
 
+- name: Case bundles - a user bundle is created with its users and groups added by id
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no user bundles and the user and group lists
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "3-5", name: Developers}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/user
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/user}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "40-1", name: Teams, $type: UserBundle}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/user/40-1/individuals}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "1-1", login: jane.doe, $type: User}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/user/40-1/groups}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "3-5", name: Developers, $type: UserGroup}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the user kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: user
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the three writes, their bodies and the recap
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 3
+          - "'/bundles/user?fields=id,name' in stub_writes[0].request.url"
+          - >-
+            stub_writes[0].request.body | from_json == {'name': 'Teams', '$type': 'UserBundle'}
+          - "'/bundles/user/40-1/individuals?fields=id' in stub_writes[1].request.url"
+          - >-
+            stub_writes[1].request.body | from_json == {'id': '1-1'}
+          - "'/bundles/user/40-1/groups?fields=id' in stub_writes[2].request.url"
+          - >-
+            stub_writes[2].request.body | from_json == {'id': '3-5'}
+          - run_kind_result.stdout is search('changed=3([^0-9]|$)')
+        fail_msg: "The user create case sent unexpected writes or reported an unexpected change count."
+
+- name: Case bundles - a second user run with the stored members sends no writes and reports no change
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with the stored user bundle
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "3-5", name: Developers}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/user
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "40-1"
+                  name: Teams
+                  individuals:
+                    - {id: "1-1", login: jane.doe}
+                  groups:
+                    - {id: "3-5", name: Developers}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/user
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the user kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: user
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and a recap with no changed task
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - run_kind_result.stdout is search('changed=0([^0-9]|$)')
+        fail_msg: "A second user run with the stored members sent writes or reported a change."
+
+- name: Case bundles - check mode predicts the user bundle and its members and sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no user bundles and the user and group lists
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "3-5", name: Developers}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/user
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the user kind in check mode
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: user
+        run_kind_check: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned create and members are reported
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - "'Would create the user bundle Teams.' in run_kind_result.stdout"
+          - "'Would add user jane.doe to the user bundle Teams.' in run_kind_result.stdout"
+          - "'Would add group Developers to the user bundle Teams.' in run_kind_result.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned user changes."
+
+- name: Case bundles - a group name the server does not know stops the user bundle before any write
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a group list without the declared group
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "3-6", name: Testers}
+          - request:
+              method: GET
+              urlPath: /api/groups
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/user
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the user kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: user
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the run stops, names the group, and sends no write
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc != 0
+          - stub_writes | length == 0
+          - "'the server does not know: Developers' in run_kind_result.stdout"
+        fail_msg: "An unknown group name did not stop the run before any write, or the message did not name it."
+
 - name: Case bundles - an owner login the server does not know stops the owned bundle before any write
   block:
     - name: Reset the stub

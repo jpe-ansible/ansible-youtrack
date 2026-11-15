@@ -1,0 +1,42 @@
+---
+# Adds one declared member to the user bundle when the bundle does not hold it. Members are never removed.
+# Inputs: bundles_member (a login or a group name), bundles_member_ids (the id of each login or name),
+# bundles_member_collection (individuals or groups) and bundles_member_noun (user or group).
+- name: Add the member when the bundle does not hold it
+  when: >-
+    bundles_member_ids[bundles_member]
+    not in (bundles_now.get(bundles_member_collection, []) | map(attribute='id') | list)
+  block:
+    - name: Report the member that check mode would add
+      ansible.builtin.debug:
+        msg: >-
+          Would add {{ bundles_member_noun }} {{ bundles_member }} to the {{ bundles_kind }} bundle
+          {{ bundles_item.name }}.
+      changed_when: true
+      when: ansible_check_mode
+
+    # The body names the member by its id, the identifier that the add request takes.
+    - name: Request the new member
+      ansible.builtin.uri:
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}/{{ bundles_now.id }}\
+          /{{ bundles_member_collection }}?fields=id"
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          id: "{{ bundles_member_ids[bundles_member] }}"
+        status_code: [200, 201]
+        validate_certs: "{{ bundles_validate_certs }}"
+        return_content: true
+      when: not ansible_check_mode
+      changed_when: true
+      no_log: true
+  rescue:
+    - name: Stop when the member cannot be added
+      ansible.builtin.fail:
+        msg: >-
+          Adding {{ bundles_member_noun }} {{ bundles_member }} to the {{ bundles_kind }} bundle
+          {{ bundles_item.name }} failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+          Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}

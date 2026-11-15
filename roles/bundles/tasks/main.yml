@@ -37,3 +37,10 @@
   vars:
     bundles_kind: owned
     bundles_declared: "{{ bundles_owned | default([]) }}"
+
+- name: Ensure the user bundles match the declared bundles
+  ansible.builtin.include_tasks: kind.yml
+  when: bundles_user | default([]) | length > 0
+  vars:
+    bundles_kind: user
+    bundles_declared: "{{ bundles_user | default([]) }}"

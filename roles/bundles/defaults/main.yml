@@ -1,6 +1,7 @@
 ---
 bundles_path: /api/admin/customFieldSettings/bundles
 bundles_users_path: /api/users
+bundles_groups_path: /api/groups
 
 # Entries requested per page. Pages are read until one comes back empty, so a list longer than one page is read in full.
 bundles_page_size: 100
@@ -31,3 +32,8 @@ bundles_kinds:
     path: ownedField
     bundle_type: OwnedBundle
     value_fields: "id,name,ordinal,description,owner(id,login),color(id)"
+  user:
+    path: user
+    bundle_type: UserBundle
+    # A user bundle holds members instead of values, so its bundle read names the members.
+    bundle_fields: "groups(id,name),individuals(id,login)"

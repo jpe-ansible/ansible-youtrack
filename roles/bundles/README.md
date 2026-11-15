@@ -1,6 +1,6 @@
 # bundles
 
-Ensures enum, state, version, build and owned bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+Ensures enum, state, version, build, owned and user bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
 missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
@@ -38,6 +38,7 @@ roles:
 | `bundles_version` | list of dict | No | `[]` | Version bundles to ensure. |
 | `bundles_build` | list of dict | No | `[]` | Build bundles to ensure. |
 | `bundles_owned` | list of dict | No | `[]` | Owned bundles to ensure. |
+| `bundles_user` | list of dict | No | `[]` | User bundles to ensure. |
 
 Each entry of `bundles_enum` has:
 
@@ -89,15 +90,27 @@ Each entry of `bundles_owned` has:
   - `description` (str, optional): the value description. Left as it is when omitted.
   - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
 
+Each entry of `bundles_user` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `users` (list of str, optional): the logins of the users that the bundle must contain. Each login must name an
+  existing user.
+- `groups` (list of str, optional): the names of the groups that the bundle must contain. Each name must name an
+  existing group.
+
+A user bundle holds members, not values, so it takes no `values` list. A member is added by its id, which the role
+looks up by login or group name.
+
 ## Behavior
 
-- Creates a missing bundle empty, then adds each declared value to it.
-- Adds a declared value that is missing.
+- Creates a missing bundle empty, then adds each declared value or member to it.
+- Adds a declared value or member that is missing.
 - Updates a declared value when a declared attribute differs from the stored value: its description, color, resolved
   flag, release date, released flag, archived flag or assembly date.
 - Leaves values that are not declared as they are.
 - Fails when a bundle declares the same value name twice.
-- Stops before any write for a bundle when a declared owner login is not a known user.
+- Stops before any write for a bundle when a declared owner login, user login or group name is not known.
+- Never removes a member of a user bundle.
 - Never renames or deletes a bundle or a value.
 - In check mode, reports each bundle, value and update it would change, and makes no write request.
 

@@ -14,6 +14,10 @@
           values:
             - name: Bug
               color_id: "1"
+      user:
+        - name: Teams
+          users: [jane.doe]
+          groups: [Developers]
       owned:
         - name: Owners
           values:
@@ -53,3 +57,4 @@
         bundles_version: "{{ test_declared['version'] if test_kind == 'version' else [] }}"
         bundles_build: "{{ test_declared['build'] if test_kind == 'build' else [] }}"
         bundles_owned: "{{ test_declared['owned'] if test_kind == 'owned' else [] }}"
+        bundles_user: "{{ test_declared['user'] if test_kind == 'user' else [] }}"
