@@ -33,6 +33,28 @@
       ansible.builtin.set_fact:
         custom_fields_attached: "{{ custom_fields_paged_result }}"
 
+- name: Find the project override of this project
+  ansible.builtin.set_fact:
+    custom_fields_attach_override: >-
+      {{ custom_fields_item.project_overrides | default([]) | selectattr('project', 'equalto', custom_fields_project)
+         | list | first | default({}, true) }}
+
+# A key the override omits falls back to the field-level bundle and empty-value setting.
+- name: Set the bundle and the empty-value setting of the attachment
+  ansible.builtin.set_fact:
+    custom_fields_attach_is_override: "{{ custom_fields_attach_override.project is defined }}"
+    custom_fields_attach_bundle: >-
+      {{ custom_fields_attach_override.bundle | default(custom_fields_item.bundle | default('')) }}
+    custom_fields_attach_can_be_empty: >-
+      {{ custom_fields_attach_override.can_be_empty | default(custom_fields_can_be_empty) | bool }}
+
+- name: Find the id of the bundle of the attachment
+  ansible.builtin.set_fact:
+    custom_fields_attach_bundle_id: >-
+      {{ (custom_fields_reads[custom_fields_kind ~ '_bundles'] | items2dict(key_name='name', value_name='id'))
+         .get(custom_fields_attach_bundle, '') }}
+  when: custom_fields_kind in custom_fields_bundle_types
+
 - name: Find the attachment of the custom field
   ansible.builtin.set_fact:
     custom_fields_attachment: >-
@@ -44,19 +66,20 @@
     msg: >-
       Custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }} has bundle
       {{ (custom_fields_attachment.bundle | default({}, true)).name | default('none', true) }}, not
-      {{ custom_fields_item.bundle }}. The role does not change the bundle of an attachment. Change the bundle in
+      {{ custom_fields_attach_bundle }}. The role does not change the bundle of an attachment. Change the bundle in
       YouTrack or change the declaration.
   when:
     - custom_fields_attachment.id is defined
     - custom_fields_kind in custom_fields_bundle_types
-    - (custom_fields_attachment.bundle | default({}, true)).id | default('', true) != custom_fields_bundle_id
+    - (custom_fields_attachment.bundle | default({}, true)).id | default('', true) != custom_fields_attach_bundle_id
 
 - name: Clear the result of an earlier request of this kind
   ansible.builtin.set_fact:
     custom_fields_attach_added: {}
 
-# The attach body is the documented one: the field id and the attachment type.
-# The attachment takes its bundle from the field default. A bundle that differs from the declaration stops the run.
+# The attach body is the documented one: the field id and the attachment type. A project named in project_overrides
+# also sends its bundle, so its attachment takes that bundle. Any other attachment takes the field default.
+# A bundle that differs from the declaration stops the run.
 # canBeEmpty of an enum or state attachment is set afterwards when it differs, because the documented attach body has
 # no canBeEmpty. A field of another type has no empty-value setting.
 - name: Attach the custom field to the project when it is not attached
@@ -77,10 +100,12 @@
           Accept: application/json
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
-        body:
-          field:
-            id: "{{ custom_fields_now.id }}"
-          $type: "{{ custom_fields_project_type }}"
+        body: >-
+          {{ {'field': {'id': custom_fields_now.id}, '$type': custom_fields_project_type}
+             | combine({'bundle': {'id': custom_fields_attach_bundle_id,
+                                   '$type': custom_fields_bundle_types[custom_fields_kind]}}
+                       if custom_fields_attach_is_override and custom_fields_kind in custom_fields_bundle_types
+                       else {}) }}
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
         return_content: true
@@ -101,11 +126,13 @@
     msg: >-
       Custom field {{ custom_fields_item.name }} attached to project {{ custom_fields_project }} has bundle
       {{ (custom_fields_attach_added.json.bundle | default({}, true)).name | default('none', true) }}, not
-      {{ custom_fields_item.bundle }}. Set the default bundle of the field in YouTrack, then run the role again.
+      {{ custom_fields_attach_bundle }}. Set the default bundle of the field in YouTrack, then run the role again.
   when:
     - custom_fields_attach_added.json is defined
     - custom_fields_kind in custom_fields_bundle_types
-    - (custom_fields_attach_added.json.bundle | default({}, true)).id | default('', true) != custom_fields_bundle_id
+    - >-
+      (custom_fields_attach_added.json.bundle | default({}, true)).id | default('', true)
+      != custom_fields_attach_bundle_id
 
 - name: Choose the stored copy of the attachment
   ansible.builtin.set_fact:
@@ -117,13 +144,13 @@
   when:
     - custom_fields_kind in custom_fields_bundle_types
     - custom_fields_attachment_target.id is defined
-    - custom_fields_attachment_target.canBeEmpty | default(none) != custom_fields_can_be_empty
+    - custom_fields_attachment_target.canBeEmpty | default(none) != custom_fields_attach_can_be_empty
   block:
     - name: Report the attachment that check mode would update
       ansible.builtin.debug:
         msg: >-
           Would set canBeEmpty of custom field {{ custom_fields_item.name }} in project {{ custom_fields_project }}
-          to {{ custom_fields_can_be_empty | string | lower }}.
+          to {{ custom_fields_attach_can_be_empty | string | lower }}.
       changed_when: true
       when: ansible_check_mode
 
@@ -137,7 +164,7 @@
           Authorization: "Bearer {{ youtrack_api_key }}"
         body_format: json
         body:
-          canBeEmpty: "{{ custom_fields_can_be_empty }}"
+          canBeEmpty: "{{ custom_fields_attach_can_be_empty }}"
         status_code: [200, 201]
         validate_certs: "{{ custom_fields_validate_certs }}"
         return_content: true
