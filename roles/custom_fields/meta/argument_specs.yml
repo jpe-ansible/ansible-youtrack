@@ -51,18 +51,45 @@ argument_specs:
             type: str
             required: false
             description: >-
-              Name of an existing enum or state bundle. It is the default bundle of a new field, and each attachment
-              must already use it.
+              Name of an existing enum or state bundle. It is the default bundle of a new field. Each attachment must
+              use it, unless its project has a project_overrides entry with its own bundle.
           projects:
             type: list
             elements: str
             required: false
             default: []
-            description: Short names of the projects the field is attached to.
+            description: >-
+              Short names of the projects the field is attached to. A project named in project_overrides takes its
+              settings from there.
           can_be_empty:
             type: bool
             required: false
             default: true
             description: >-
               Whether an issue in each attached project may leave the field empty. Only an enum or state field takes
-              false. The role stops when a field of another type declares false.
+              false. The role stops when a field of another type declares false. A project_overrides entry can set
+              its own value.
+          project_overrides:
+            type: list
+            elements: dict
+            required: false
+            default: []
+            description: >-
+              Projects whose attachment takes its own bundle, its own empty-value setting, or both. Each project is
+              attached like a project in projects. A key an entry omits falls back to the field-level bundle or
+              can_be_empty.
+            options:
+              project:
+                type: str
+                required: true
+                description: Short name of the project. Each project may appear once in project_overrides.
+              bundle:
+                type: str
+                required: false
+                description: >-
+                  Name of an existing bundle of the same kind as the field. Only an enum or state field takes a bundle.
+              can_be_empty:
+                type: bool
+                required: false
+                description: >-
+                  Whether an issue in this project may leave the field empty. Only an enum or state field takes false.

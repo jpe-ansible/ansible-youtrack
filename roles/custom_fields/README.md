@@ -24,6 +24,27 @@ roles:
             - DEMO
 ```
 
+### Project overrides
+
+A project in `project_overrides` takes its own bundle or empty-value setting. The field-level `bundle` is still the
+default bundle of a new field.
+
+```yaml
+custom_fields_declared:
+  - name: Type
+    field_type: enum[1]
+    bundle: Types
+    projects:
+      - DEMO
+    project_overrides:
+      - project: SAMPLE
+        bundle: Kinds
+        can_be_empty: false
+```
+
+The field attaches to `DEMO` with the bundle `Types`. It attaches to `SAMPLE` with the bundle `Kinds`, and an issue in
+`SAMPLE` cannot leave `Type` empty.
+
 ## Inputs
 
 | Variable | Type | Required | Default | Description |
@@ -44,6 +65,15 @@ Each entry of `custom_fields_declared` has:
 - `can_be_empty` (bool, optional): whether an issue in each attached project may leave the field empty. Default `true`.
   Only `enum[1]`, `enum[*]` and `state[1]` take `false`. The other types have no empty-value setting. A workflow rule
   can make a field of another type required.
+- `project_overrides` (list of dict, optional): projects that take their own bundle or empty-value setting. Default `[]`.
+  Each entry has:
+  - `project` (str, required): the short name of the project. Each project appears once in the list.
+  - `bundle` (str, optional): the name of an existing bundle. Only `enum[1]`, `enum[*]` and `state[1]` take a bundle.
+  - `can_be_empty` (bool, optional): whether an issue in this project may leave the field empty. Only `enum[1]`,
+    `enum[*]` and `state[1]` take `false`.
+
+  A project named in `project_overrides` is attached like a project in `projects`. If a project appears in both lists,
+  its entry wins. A key that an entry omits falls back to the field-level `bundle` or `can_be_empty`.
 
 ## Behavior
 
@@ -51,14 +81,20 @@ Each entry of `custom_fields_declared` has:
 - Fails when a field with the same name exists with another type. The role never changes the type of a field.
 - Fails when a named bundle does not exist. Check mode reports this instead of failing.
 - Fails when a named project does not exist.
-- Attaches the field to each named project that has no attachment yet.
-- Fails when an existing attachment uses another bundle than the declaration. The role does not change the bundle of an
-  attachment.
-- Sets `canBeEmpty` on an enum or state attachment when it differs from `can_be_empty`.
-- Fails when a field of another type declares `can_be_empty: false`.
+- Attaches the field to each named project that has no attachment yet. The attach request of a project in
+  `project_overrides` names that entry's bundle.
+- Fails when an existing attachment uses another bundle than the one declared for its project. The role does not change
+  the bundle of an attachment.
+- Sets `canBeEmpty` on an enum or state attachment when it differs from the setting declared for its project.
+- Fails when a field of another type declares `can_be_empty: false`, in the field or in a project override.
+- Fails before it writes the field when a project override names a bundle for a field type without one, declares
+  `can_be_empty: false` for a field type without an empty-value setting, names a project twice, or names a bundle that
+  does not exist.
 - Never deletes a field and never detaches a field from a project.
 - In check mode, reports each field, attachment and update it would change, and makes no write request.
 
 ## Known limits
 
 - In check mode, a bundle that does not exist yet cannot be confirmed as the default bundle of a field. The run says so.
+- In check mode, the empty-value setting of a new attachment is not predicted. The run sets it after the attach request
+  when it differs.

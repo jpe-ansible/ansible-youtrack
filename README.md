@@ -87,7 +87,7 @@ Each role takes the lists shown below. An empty list, the default, changes nothi
 | --- | --- | --- | --- |
 | `bundles_enum` | `bundles` | `[]` | `name`, `values` (each value: `name`, `color_id`, `description`) |
 | `bundles_state` | `bundles` | `[]` | `name`, `values` (each value: `name`, `is_resolved`, `description`) |
-| `custom_fields_declared` | `custom_fields` | `[]` | `name`, `field_type`, `bundle`, `projects`, `can_be_empty` |
+| `custom_fields_declared` | `custom_fields` | `[]` | `name`, `field_type`, `bundle`, `projects`, `can_be_empty`, `project_overrides` |
 | `link_types_declared` | `link_types` | `[]` | `name`, `source_to_target`, `target_to_source`, `directed`, `aggregation` |
 
 The entry fields, their types and their defaults are in each role's README.
