@@ -1,6 +1,6 @@
 # bundles
 
-Ensures enum and state bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+Ensures enum, state and version bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
 missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
@@ -35,6 +35,7 @@ roles:
 | `youtrack_validate_certs` | bool | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
 | `bundles_enum` | list of dict | No | `[]` | Enum bundles to ensure. |
 | `bundles_state` | list of dict | No | `[]` | State bundles to ensure. |
+| `bundles_version` | list of dict | No | `[]` | Version bundles to ensure. |
 
 Each entry of `bundles_enum` has:
 
@@ -53,11 +54,25 @@ Each entry of `bundles_state` has:
   - `color_id` (str, optional): a palette index, for example `"2"`. Left as it is when omitted.
   - `description` (str, optional): the value description. Left as it is when omitted.
 
+Each entry of `bundles_version` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+  - `released` (bool, optional): whether the version is released. Left as it is when omitted.
+  - `archived` (bool, optional): whether the version is archived. Archiving sets a flag and deletes nothing. Left as it
+    is when omitted.
+  - `release_date` (int, optional): the release date as epoch milliseconds in UTC, for example `1576367999999`. Left as
+    it is when omitted.
+
 ## Behavior
 
 - Creates a missing bundle empty, then adds each declared value to it.
 - Adds a declared value that is missing.
-- Updates a declared value when its description, color or resolved flag differs from the declaration.
+- Updates a declared value when a declared attribute differs from the stored value: its description, color, resolved
+  flag, release date, released flag or archived flag.
 - Leaves values that are not declared as they are.
 - Fails when a bundle declares the same value name twice.
 - Never renames or deletes a bundle or a value.

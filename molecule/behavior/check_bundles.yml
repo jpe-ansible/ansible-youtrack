@@ -14,6 +14,15 @@
           values:
             - name: Bug
               color_id: "1"
+      version:
+        - name: Releases
+          values:
+            - name: "1.0"
+              description: First release
+              color_id: "2"
+              released: true
+              archived: false
+              release_date: 1576367999999
       state:
         - name: States
           values:
@@ -27,3 +36,4 @@
       vars:
         bundles_enum: "{{ test_declared['enum'] if test_kind == 'enum' else [] }}"
         bundles_state: "{{ test_declared['state'] if test_kind == 'state' else [] }}"
+        bundles_version: "{{ test_declared['version'] if test_kind == 'version' else [] }}"

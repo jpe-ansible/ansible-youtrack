@@ -62,6 +62,34 @@
         provided: >-
           {{ argspec_connection | combine({'bundles_state':
             [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false, 'color': '2'}]}]}) }}
+      - name: bundles accepts a version bundle with its value attributes
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases', 'values': [
+            {'name': '1.0', 'description': 'First release', 'color_id': '2', 'released': true,
+             'archived': false, 'release_date': 1576367999999}]}]}) }}
+      - name: bundles rejects a version value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_version -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version':
+            [{'name': 'Releases', 'values': [{'description': 'x'}]}]}) }}
+      - name: bundles rejects a non-boolean released flag on a version value
+        role: bundles
+        expect: fail
+        error: "released"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases',
+            'values': [{'name': '1.0', 'released': 'sometimes'}]}]}) }}
+      - name: bundles rejects a release date that is not a number
+        role: bundles
+        expect: fail
+        error: "release_date"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases',
+            'values': [{'name': '1.0', 'release_date': 'soon'}]}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

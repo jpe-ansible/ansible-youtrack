@@ -284,3 +284,129 @@
           - stub_writes | length == 0
           - "'Would update value Submitted in the state bundle States: color.' in state_check_run.stdout"
         fail_msg: "Check mode sent writes or did not report the planned colour update."
+
+- name: Case bundles - a version bundle is created with its value and the value attributes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no version bundles
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/version}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "30-1", name: Releases, $type: VersionBundle, values: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/version/30-1/values}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "30-2", name: "1.0", $type: VersionBundleElement}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/version/30-1/values/30-2}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "30-2", name: "1.0", $type: VersionBundleElement}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the version kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: version
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the three writes, their bodies and the recap
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 3
+          - "'/bundles/version?fields=id,name' in stub_writes[0].request.url"
+          - >-
+            stub_writes[0].request.body | from_json == {'name': 'Releases', '$type': 'VersionBundle'}
+          - "'/values?fields=' in stub_writes[1].request.url"
+          - >-
+            stub_writes[1].request.body | from_json == {'name': '1.0'}
+          - "'/values/30-2?fields=id' in stub_writes[2].request.url"
+          - >-
+            stub_writes[2].request.body | from_json == {'description': 'First release', 'color': {'id': '2'},
+            'released': true, 'releaseDate': 1576367999999}
+          - run_kind_result.stdout is search('changed=3([^0-9]|$)')
+        fail_msg: "The version create case sent unexpected writes or reported an unexpected change count."
+
+- name: Case bundles - a second version run with the stored attributes sends no writes and reports no change
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with the stored version bundle
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "30-1"
+                  name: Releases
+                  values:
+                    - {id: "30-2", name: "1.0", description: First release, color: {id: "2"}, released: true,
+                       archived: false, releaseDate: 1576367999999}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the version kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: version
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and a recap with no changed task
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - run_kind_result.stdout is search('changed=0([^0-9]|$)')
+        fail_msg: "A second version run with the stored attributes sent writes or reported a change."
+
+- name: Case bundles - check mode predicts the version bundle and value and sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no version bundles
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the version kind in check mode
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: version
+        run_kind_check: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned create and add are reported
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - "'Would create the version bundle Releases.' in run_kind_result.stdout"
+          - "'Would add value 1.0 to the version bundle Releases.' in run_kind_result.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned version changes."

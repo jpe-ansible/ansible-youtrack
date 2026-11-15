@@ -52,6 +52,7 @@
       {{ bundles_value_added.json if bundles_value_added.json is defined else bundles_value_now }}
 
 # The color is written as an object with an id, the shape the read side gets from color(id).
+# Each declared attribute is compared with the stored value. Only the attributes the entry declares are compared.
 - name: List the declared attributes that differ from the stored value
   ansible.builtin.set_fact:
     bundles_value_changes: >-
@@ -65,8 +66,20 @@
           != ((bundles_value_target.color | default({}, true)).id | default('', true) | string)
           else [])
          + (['isResolved']
-          if bundles_kind == 'state' and bundles_value.is_resolved is defined
+          if bundles_value.is_resolved is defined
           and bundles_value.is_resolved != (bundles_value_target.isResolved | default(false, true))
+          else [])
+         + (['releaseDate']
+          if bundles_value.release_date is defined
+          and (bundles_value.release_date | string) != (bundles_value_target.releaseDate | default('', true) | string)
+          else [])
+         + (['released']
+          if bundles_value.released is defined
+          and bundles_value.released != (bundles_value_target.released | default(false, true))
+          else [])
+         + (['archived']
+          if bundles_value.archived is defined
+          and bundles_value.archived != (bundles_value_target.archived | default(false, true))
           else []) }}
 
 - name: Update the value when a declared attribute differs
@@ -81,7 +94,10 @@
              | combine({'description': bundles_value.description} if 'description' in bundles_value_changes else {})
              | combine({'color': {'id': bundles_value.color_id | string}}
                        if 'color' in bundles_value_changes else {})
-             | combine({'isResolved': bundles_value.is_resolved} if 'isResolved' in bundles_value_changes else {}) }}
+             | combine({'isResolved': bundles_value.is_resolved} if 'isResolved' in bundles_value_changes else {})
+             | combine({'releaseDate': bundles_value.release_date} if 'releaseDate' in bundles_value_changes else {})
+             | combine({'released': bundles_value.released} if 'released' in bundles_value_changes else {})
+             | combine({'archived': bundles_value.archived} if 'archived' in bundles_value_changes else {}) }}
 
     - name: Report the value that check mode would update
       ansible.builtin.debug:

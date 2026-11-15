@@ -15,3 +15,6 @@ bundles_kinds:
   state:
     bundle_type: StateBundle
     value_fields: "id,name,ordinal,description,isResolved,color(id)"
+  version:
+    bundle_type: VersionBundle
+    value_fields: "id,name,ordinal,description,releaseDate,released,archived,color(id)"

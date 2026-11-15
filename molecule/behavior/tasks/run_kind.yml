@@ -1,0 +1,16 @@
+---
+# Runs the bundles role for one kind in a child ansible-playbook process, with --check when run_kind_check is true.
+# Inputs: run_kind_name (the kind) and run_kind_check (true or false). The result is kept in run_kind_result. The run
+# does not fail the case, so each case asserts on the return code and on the output.
+- name: Run the bundles role for one kind
+  ansible.builtin.command:
+    argv: "{{ ['ansible-playbook'] + (['--check'] if run_kind_check else []) + [playbook_dir ~ '/check_bundles.yml'] }}"
+  environment:
+    ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+    YTC_TEST_URL: "{{ youtrack_url }}"
+    YTC_TEST_KEY: "{{ youtrack_api_key }}"
+    YTC_TEST_KIND: "{{ run_kind_name }}"
+  no_log: true
+  changed_when: false
+  failed_when: false
+  register: run_kind_result
