@@ -23,6 +23,38 @@
       empty-value setting. Only an enum or state field can be set so that it cannot be empty. A workflow rule can
       make a field of this type required.
 
+- name: Check that only a bundle-backed field names a bundle in a project override
+  ansible.builtin.assert:
+    that:
+      - >-
+        custom_fields_kind in custom_fields_bundle_types
+        or (custom_fields_item.project_overrides | default([]) | selectattr('bundle', 'defined') | list | length == 0)
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which takes no bundle.
+      Remove bundle from its project_overrides entries.
+
+- name: Check that only a bundle-backed field declares in a project override that it cannot be empty
+  ansible.builtin.assert:
+    that:
+      - >-
+        custom_fields_kind in custom_fields_bundle_types
+        or (custom_fields_item.project_overrides | default([]) | selectattr('can_be_empty', 'defined')
+        | selectattr('can_be_empty', 'equalto', false) | list | length == 0)
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which has no empty-value
+      setting. Remove can_be_empty: false from its project_overrides entries. Only an enum or state field can be set so
+      that it cannot be empty.
+
+- name: Check that each project appears once in the project overrides
+  ansible.builtin.assert:
+    that:
+      - >-
+        (custom_fields_item.project_overrides | default([]) | map(attribute='project') | unique | list | length)
+        == (custom_fields_item.project_overrides | default([]) | length)
+    fail_msg: >-
+      Custom field {{ custom_fields_item.name }} names a project more than once in project_overrides. Each project may
+      appear once.
+
 - name: Find the current custom field
   ansible.builtin.set_fact:
     custom_fields_now: >-
@@ -64,6 +96,32 @@
   when:
     - custom_fields_kind in custom_fields_bundle_types
     - custom_fields_bundle_id == ''
+    - ansible_check_mode
+
+- name: Find the project overrides whose bundle does not exist
+  ansible.builtin.set_fact:
+    custom_fields_missing_overrides: >-
+      {{ custom_fields_item.project_overrides | default([]) | selectattr('bundle', 'defined')
+         | rejectattr('bundle', 'in',
+           custom_fields_reads[custom_fields_kind ~ '_bundles'] | map(attribute='name') | list)
+         | list if custom_fields_kind in custom_fields_bundle_types else [] }}
+
+- name: Stop when a project override names a bundle that does not exist
+  ansible.builtin.fail:
+    msg: >-
+      Bundle {{ custom_fields_missing_overrides | map(attribute='bundle') | join(', ') }} named by the project
+      overrides of custom field {{ custom_fields_item.name }} was not found. Ensure it with the bundles role first.
+  when:
+    - custom_fields_missing_overrides | length > 0
+    - not ansible_check_mode
+
+- name: Report that check mode cannot yet confirm a project override bundle that does not exist
+  ansible.builtin.debug:
+    msg: >-
+      Bundle {{ custom_fields_missing_overrides | map(attribute='bundle') | join(', ') }} is not present yet. Check mode
+      cannot confirm the bundle of custom field {{ custom_fields_item.name }} in its project overrides.
+  when:
+    - custom_fields_missing_overrides | length > 0
     - ansible_check_mode
 
 - name: Clear the result of an earlier request of this kind
@@ -149,9 +207,17 @@
           {{ custom_fields_item.name }} failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
           Server response: {{ ansible_failed_result.content | default('none') | truncate(300) }}
 
+- name: Find the projects that take their own bundle or empty-value setting
+  ansible.builtin.set_fact:
+    custom_fields_override_projects: >-
+      {{ custom_fields_item.project_overrides | default([]) | map(attribute='project') | list }}
+
+# A project named in project_overrides is attached once, with the override's settings, even when also in projects.
 - name: Attach the custom field to its projects
   ansible.builtin.include_tasks: attach.yml
-  loop: "{{ custom_fields_item.projects | default([]) }}"
+  loop: >-
+    {{ custom_fields_item.projects | default([]) | reject('in', custom_fields_override_projects) | list
+       + custom_fields_override_projects }}
   loop_control:
     loop_var: custom_fields_project
     label: "{{ custom_fields_item.name }} in {{ custom_fields_project }}"
