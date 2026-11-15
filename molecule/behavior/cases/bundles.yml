@@ -970,7 +970,7 @@
         that:
           - run_kind_result.rc != 0
           - stub_writes | length == 0
-          - "'the server does not know: Developers' in run_kind_result.stdout"
+          - "'the server does not know: Developers' in run_kind_output"
         fail_msg: "An unknown group name did not stop the run before any write, or the message did not name it."
 
 - name: Case bundles - an owner login the server does not know stops the owned bundle before any write
@@ -1013,5 +1013,5 @@
         that:
           - run_kind_result.rc != 0
           - stub_writes | length == 0
-          - "'owner login that the server does not know: jane.doe' in run_kind_result.stdout"
+          - "'owner login that the server does not know: jane.doe' in run_kind_output"
         fail_msg: "An unknown owner login did not stop the run before any write, or the message did not name it."

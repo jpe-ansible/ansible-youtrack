@@ -14,3 +14,9 @@
   changed_when: false
   failed_when: false
   register: run_kind_result
+
+# Both output streams on one line, so a case can match a message wherever it is printed and however it is wrapped.
+- name: Keep the output of the run on one line
+  ansible.builtin.set_fact:
+    run_kind_output: "{{ (run_kind_result.stdout ~ ' ' ~ run_kind_result.stderr) | regex_replace('\\s+', ' ') }}"
+  no_log: true
