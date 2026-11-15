@@ -536,3 +536,214 @@
           - "'Would create the build bundle Builds.' in run_kind_result.stdout"
           - "'Would add value 1.0.0 to the build bundle Builds.' in run_kind_result.stdout"
         fail_msg: "Check mode sent writes or did not report the planned build changes."
+
+- name: Case bundles - an owned bundle is created with its value and the owner written by id
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no owned bundles and a user list with the owner
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/ownedField
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/ownedField}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "60-1", name: Owners, $type: OwnedBundle, values: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/ownedField/60-1/values}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "60-2", name: Core, $type: OwnedBundleElement}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/bundles/ownedField/60-1/values/60-2}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "60-2", name: Core, $type: OwnedBundleElement}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the owned kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: owned
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the three writes, their bodies and the recap
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 3
+          - "'/bundles/ownedField?fields=id,name' in stub_writes[0].request.url"
+          - >-
+            stub_writes[0].request.body | from_json == {'name': 'Owners', '$type': 'OwnedBundle'}
+          - "'/values?fields=' in stub_writes[1].request.url"
+          - >-
+            stub_writes[1].request.body | from_json == {'name': 'Core'}
+          - "'/values/60-2?fields=id' in stub_writes[2].request.url"
+          - >-
+            stub_writes[2].request.body | from_json == {'description': 'Core team', 'color': {'id': '3'},
+            'owner': {'id': '1-1'}}
+          - run_kind_result.stdout is search('changed=3([^0-9]|$)')
+        fail_msg: "The owned create case sent unexpected writes or reported an unexpected change count."
+
+- name: Case bundles - a second owned run with the stored owner sends no writes and reports no change
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with the stored owned bundle
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/ownedField
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "60-1"
+                  name: Owners
+                  values:
+                    - {id: "60-2", name: Core, description: Core team, color: {id: "3"},
+                       owner: {id: "1-1", login: jane.doe}}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/ownedField
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the owned kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: owned
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and a recap with no changed task
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - run_kind_result.stdout is search('changed=0([^0-9]|$)')
+        fail_msg: "A second owned run with the stored owner sent writes or reported a change."
+
+- name: Case bundles - check mode predicts the owned bundle and value and sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a server with no owned bundles and a user list with the owner
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-1", login: jane.doe}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/ownedField
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the owned kind in check mode
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: owned
+        run_kind_check: true
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes and the planned create and add are reported
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc == 0
+          - stub_writes | length == 0
+          - "'Would create the owned bundle Owners.' in run_kind_result.stdout"
+          - "'Would add value Core to the owned bundle Owners.' in run_kind_result.stdout"
+        fail_msg: "Check mode sent writes or did not report the planned owned changes."
+
+- name: Case bundles - an owner login the server does not know stops the owned bundle before any write
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings of a user list without the declared owner
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: "1-2", login: john.smith}
+          - request:
+              method: GET
+              urlPath: /api/users
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/ownedField
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the bundles role for the owned kind
+      ansible.builtin.include_tasks: ../tasks/run_kind.yml
+      vars:
+        run_kind_name: owned
+        run_kind_check: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the run stops, names the login, and sends no write
+      ansible.builtin.assert:
+        that:
+          - run_kind_result.rc != 0
+          - stub_writes | length == 0
+          - "'owner login that the server does not know: jane.doe' in run_kind_result.stdout"
+        fail_msg: "An unknown owner login did not stop the run before any write, or the message did not name it."

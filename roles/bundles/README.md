@@ -1,6 +1,6 @@
 # bundles
 
-Ensures enum, state, version and build bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+Ensures enum, state, version, build and owned bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
 missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
@@ -37,6 +37,7 @@ roles:
 | `bundles_state` | list of dict | No | `[]` | State bundles to ensure. |
 | `bundles_version` | list of dict | No | `[]` | Version bundles to ensure. |
 | `bundles_build` | list of dict | No | `[]` | Build bundles to ensure. |
+| `bundles_owned` | list of dict | No | `[]` | Owned bundles to ensure. |
 
 Each entry of `bundles_enum` has:
 
@@ -78,6 +79,16 @@ Each entry of `bundles_build` has:
   - `assemble_date` (int, optional): the assembly date as epoch milliseconds in UTC, for example `1627636495000`. Left
     as it is when omitted.
 
+Each entry of `bundles_owned` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `owner` (str, optional): the login of the user who owns the value. The login must name an existing user. Left as it
+    is when omitted.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+
 ## Behavior
 
 - Creates a missing bundle empty, then adds each declared value to it.
@@ -86,6 +97,7 @@ Each entry of `bundles_build` has:
   flag, release date, released flag, archived flag or assembly date.
 - Leaves values that are not declared as they are.
 - Fails when a bundle declares the same value name twice.
+- Stops before any write for a bundle when a declared owner login is not a known user.
 - Never renames or deletes a bundle or a value.
 - In check mode, reports each bundle, value and update it would change, and makes no write request.
 

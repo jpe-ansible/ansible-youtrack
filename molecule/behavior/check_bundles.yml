@@ -14,6 +14,13 @@
           values:
             - name: Bug
               color_id: "1"
+      owned:
+        - name: Owners
+          values:
+            - name: Core
+              description: Core team
+              color_id: "3"
+              owner: jane.doe
       build:
         - name: Builds
           values:
@@ -45,3 +52,4 @@
         bundles_state: "{{ test_declared['state'] if test_kind == 'state' else [] }}"
         bundles_version: "{{ test_declared['version'] if test_kind == 'version' else [] }}"
         bundles_build: "{{ test_declared['build'] if test_kind == 'build' else [] }}"
+        bundles_owned: "{{ test_declared['owned'] if test_kind == 'owned' else [] }}"

@@ -109,6 +109,24 @@
         provided: >-
           {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds',
             'values': [{'name': '1.0.0', 'assemble_date': 'soon'}]}]}) }}
+      - name: bundles accepts an owned bundle with an owner on a value
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners', 'values': [
+            {'name': 'Core', 'owner': 'jane.doe', 'color_id': '3', 'description': 'Core team'}]}]}) }}
+      - name: bundles rejects an owned value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_owned -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners', 'values': [{'owner': 'jane.doe'}]}]}) }}
+      - name: bundles rejects an owned bundle without values
+        role: bundles
+        expect: fail
+        error: "values found in bundles_owned"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners'}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

@@ -22,7 +22,7 @@
 
     - name: Request the new value
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}/{{ bundles_now.id }}/values\
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}/{{ bundles_now.id }}/values\
           ?fields={{ bundles_kinds[bundles_kind].value_fields }}"
         method: POST
         headers:
@@ -50,6 +50,11 @@
   ansible.builtin.set_fact:
     bundles_value_target: >-
       {{ bundles_value_added.json if bundles_value_added.json is defined else bundles_value_now }}
+
+# The owner is written as an object with the id of the user. The directory read of this kind maps the login to the id.
+- name: Find the id of the declared owner
+  ansible.builtin.set_fact:
+    bundles_value_owner_id: "{{ bundles_user_ids[bundles_value.owner] if bundles_value.owner is defined else '' }}"
 
 # The color is written as an object with an id, the shape the read side gets from color(id).
 # Each declared attribute is compared with the stored value. Only the attributes the entry declares are compared.
@@ -84,6 +89,10 @@
          + (['assembleDate']
           if bundles_value.assemble_date is defined
           and (bundles_value.assemble_date | string) != (bundles_value_target.assembleDate | default('', true) | string)
+          else [])
+         + (['owner']
+          if bundles_value.owner is defined
+          and bundles_value_owner_id != ((bundles_value_target.owner | default({}, true)).id | default('', true))
           else []) }}
 
 - name: Update the value when a declared attribute differs
@@ -103,7 +112,9 @@
              | combine({'released': bundles_value.released} if 'released' in bundles_value_changes else {})
              | combine({'archived': bundles_value.archived} if 'archived' in bundles_value_changes else {})
              | combine({'assembleDate': bundles_value.assemble_date}
-                       if 'assembleDate' in bundles_value_changes else {}) }}
+                       if 'assembleDate' in bundles_value_changes else {})
+             | combine({'owner': {'id': bundles_value_owner_id}}
+                       if 'owner' in bundles_value_changes else {}) }}
 
     - name: Report the value that check mode would update
       ansible.builtin.debug:
@@ -115,7 +126,7 @@
 
     - name: Request the value update
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}/{{ bundles_now.id }}/values\
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}/{{ bundles_now.id }}/values\
           /{{ bundles_value_target.id }}?fields=id"
         method: POST
         headers:

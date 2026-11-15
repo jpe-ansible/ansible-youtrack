@@ -5,10 +5,15 @@
       - bundles_declared | map(attribute='name') | unique | list | length == bundles_declared | length
     fail_msg: "Two declared {{ bundles_kind }} bundles have the same name. Each bundle name must be unique."
 
+# The owners of an owned bundle are written by id, so the logins are read once before any bundle is changed.
+- name: Read the users that the declared owners name
+  ansible.builtin.include_tasks: directory.yml
+  when: bundles_kind == 'owned'
+
 - name: Read every bundle of this kind
   ansible.builtin.include_tasks: read_page.yml
   vars:
-    bundles_paged_url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}\
+    bundles_paged_url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}\
       ?fields=id,name,values({{ bundles_kinds[bundles_kind].value_fields }})"
     bundles_paged_size: "{{ bundles_page_size }}"
     bundles_paged_max: "{{ bundles_read_limit }}"

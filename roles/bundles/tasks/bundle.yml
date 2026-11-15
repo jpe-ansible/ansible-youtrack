@@ -5,6 +5,23 @@
       - bundles_item['values'] | map(attribute='name') | unique | list | length == bundles_item['values'] | length
     fail_msg: "Bundle {{ bundles_item.name }} declares a value name more than once. Each value name must be unique."
 
+# Every declared owner login must be a known user. The check runs before any write for this bundle.
+- name: List the declared owner logins that the server does not know
+  ansible.builtin.set_fact:
+    bundles_unknown_owners: >-
+      {{ bundles_item['values'] | selectattr('owner', 'defined') | map(attribute='owner') | list
+         | difference(bundles_user_ids.keys() | list) }}
+  when: bundles_kind == 'owned'
+
+- name: Stop when a declared owner is not a known user
+  ansible.builtin.assert:
+    that:
+      - bundles_unknown_owners | length == 0
+    fail_msg: >-
+      The {{ bundles_kind }} bundle {{ bundles_item.name }} names an owner login that the server does not know:
+      {{ bundles_unknown_owners | join(', ') }}.
+  when: bundles_kind == 'owned'
+
 - name: Find the current bundle
   ansible.builtin.set_fact:
     bundles_now: >-
@@ -26,7 +43,7 @@
     # The create body names the bundle and its $type and sends no values. Each value is added by its own request below.
     - name: Request the new bundle
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields=id,name"
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}?fields=id,name"
         method: POST
         headers:
           Accept: application/json

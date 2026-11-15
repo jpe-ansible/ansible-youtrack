@@ -1,7 +1,7 @@
 # ansible-youtrack
 
 Ansible collection `jpe_ansible.youtrack`. Its roles make a JetBrains YouTrack configuration match a declared
-configuration. They manage enum, state, version and build bundles, global custom fields, and issue link types. One role, `export`,
+configuration. They manage enum, state, version, build and owned bundles, global custom fields, and issue link types. One role, `export`,
 reads a server's configuration into a local JSON file and changes nothing on the server.
 
 [![CI Gate][ci-badge]][ci-runs] [![License][license-badge]](LICENSE)
@@ -62,7 +62,7 @@ Run the bundles role before the custom fields role. An enum or state field uses 
 
 | Role | Manages | Reference |
 | --- | --- | --- |
-| `jpe_ansible.youtrack.bundles` | Enum, state, version and build bundles and their values. | [README](roles/bundles/README.md) |
+| `jpe_ansible.youtrack.bundles` | Enum, state, version, build and owned bundles and their values. | [README](roles/bundles/README.md) |
 | `jpe_ansible.youtrack.custom_fields` | Global custom fields and their project attachments. | [README](roles/custom_fields/README.md) |
 | `jpe_ansible.youtrack.link_types` | Issue link types and their labels and flags. | [README](roles/link_types/README.md) |
 | `jpe_ansible.youtrack.export` | A server's configuration, written to one local JSON file. Changes nothing on the server. | [README](roles/export/README.md) |
@@ -89,6 +89,7 @@ Each role takes the lists shown below. An empty list, the default, changes nothi
 | `bundles_state` | `bundles` | `[]` | `name`, `values` (each value: `name`, `is_resolved`, `color_id`, `description`) |
 | `bundles_version` | `bundles` | `[]` | `name`, `values` (each value: `name`, `description`, `color_id`, `released`, `archived`, `release_date`) |
 | `bundles_build` | `bundles` | `[]` | `name`, `values` (each value: `name`, `description`, `color_id`, `assemble_date`) |
+| `bundles_owned` | `bundles` | `[]` | `name`, `values` (each value: `name`, `owner`, `description`, `color_id`) |
 | `custom_fields_declared` | `custom_fields` | `[]` | `name`, `field_type`, `bundle`, `projects`, `can_be_empty`, `project_overrides` |
 | `link_types_declared` | `link_types` | `[]` | `name`, `source_to_target`, `target_to_source`, `directed`, `aggregation` |
 
