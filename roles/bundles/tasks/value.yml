@@ -60,7 +60,7 @@
           and (bundles_value.description | string) != (bundles_value_target.description | default('', true) | string)
           else [])
          + (['color']
-          if bundles_kind == 'enum' and bundles_value.color_id is defined
+          if bundles_value.color_id is defined
           and (bundles_value.color_id | string)
           != ((bundles_value_target.color | default({}, true)).id | default('', true) | string)
           else [])

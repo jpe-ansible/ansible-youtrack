@@ -14,4 +14,4 @@ bundles_kinds:
     value_fields: "id,name,ordinal,description,color(id)"
   state:
     bundle_type: StateBundle
-    value_fields: "id,name,ordinal,description,isResolved"
+    value_fields: "id,name,ordinal,description,isResolved,color(id)"

@@ -49,6 +49,19 @@
         provided: >-
           {{ argspec_connection | combine({'bundles_state':
             [{'name': 'States', 'values': [{'name': 'Submitted'}]}]}) }}
+      - name: bundles accepts a color on a state value
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_state':
+            [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false, 'color_id': '2'}]}]}) }}
+      - name: bundles rejects a state value with a color key other than color_id
+        role: bundles
+        expect: fail
+        error: "color"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_state':
+            [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false, 'color': '2'}]}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

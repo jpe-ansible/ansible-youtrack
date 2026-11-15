@@ -76,6 +76,11 @@ argument_specs:
                 type: bool
                 required: true
                 description: Whether an issue in this state counts as resolved.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "2". Left as it is when omitted.
               description:
                 type: str
                 required: false

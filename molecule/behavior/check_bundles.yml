@@ -1,18 +1,29 @@
 ---
-# Run with ansible-playbook --check by a test case, so ansible_check_mode is true for the whole run.
-- name: Bundles role in check mode
+# Run by a test case with ansible-playbook, with or without --check, so ansible_check_mode is true only when the case
+# passes --check. YTC_TEST_KIND names the bundle kind to declare. It is enum when the variable is not set.
+- name: Bundles role for one kind
   hosts: localhost
   gather_facts: false
   vars:
     youtrack_url: "{{ lookup('ansible.builtin.env', 'YTC_TEST_URL') }}"
     youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KEY') }}"
+    test_kind: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KIND') | default('enum', true) }}"
+    test_declared:
+      enum:
+        - name: Types
+          values:
+            - name: Bug
+              color_id: "1"
+      state:
+        - name: States
+          values:
+            - name: Submitted
+              is_resolved: false
+              color_id: "2"
   tasks:
-    - name: Run the bundles role
+    - name: Run the bundles role for the selected kind
       ansible.builtin.include_role:
         name: bundles
       vars:
-        bundles_enum:
-          - name: Types
-            values:
-              - name: Bug
-                color_id: "1"
+        bundles_enum: "{{ test_declared['enum'] if test_kind == 'enum' else [] }}"
+        bundles_state: "{{ test_declared['state'] if test_kind == 'state' else [] }}"

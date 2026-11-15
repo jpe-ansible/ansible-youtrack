@@ -50,6 +50,7 @@ Each entry of `bundles_state` has:
 - `values` (list of dict, required): the values the bundle must contain. Each value has:
   - `name` (str, required): the value name. The value is matched by this name within its bundle.
   - `is_resolved` (bool, required): whether an issue in this state counts as resolved.
+  - `color_id` (str, optional): a palette index, for example `"2"`. Left as it is when omitted.
   - `description` (str, optional): the value description. Left as it is when omitted.
 
 ## Behavior
