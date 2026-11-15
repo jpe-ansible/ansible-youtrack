@@ -1,0 +1,35 @@
+---
+# Reads every user into bundles_user_ids, which maps each login to the user id. Every user bundle also reads every group
+# into bundles_group_ids, which maps each group name to the group id. The bundle tasks write the ids, and they stop
+# before any write when a declared login or group name is not in these maps.
+- name: Read every user
+  ansible.builtin.include_tasks: read_page.yml
+  vars:
+    bundles_paged_url: "{{ youtrack_url }}{{ bundles_users_path }}?fields=id,login"
+    bundles_paged_size: "{{ bundles_page_size }}"
+    bundles_paged_max: "{{ bundles_read_limit }}"
+    bundles_paged_skip: 0
+    bundles_paged_rows: []
+    bundles_paged_what: users
+    bundles_paged_validate_certs: "{{ bundles_validate_certs }}"
+
+- name: Keep the user ids by login
+  ansible.builtin.set_fact:
+    bundles_user_ids: "{{ bundles_paged_result | items2dict(key_name='login', value_name='id') }}"
+
+- name: Read every group
+  ansible.builtin.include_tasks: read_page.yml
+  vars:
+    bundles_paged_url: "{{ youtrack_url }}{{ bundles_groups_path }}?fields=id,name"
+    bundles_paged_size: "{{ bundles_page_size }}"
+    bundles_paged_max: "{{ bundles_read_limit }}"
+    bundles_paged_skip: 0
+    bundles_paged_rows: []
+    bundles_paged_what: groups
+    bundles_paged_validate_certs: "{{ bundles_validate_certs }}"
+  when: bundles_kind == 'user'
+
+- name: Keep the group ids by name
+  ansible.builtin.set_fact:
+    bundles_group_ids: "{{ bundles_paged_result | items2dict(key_name='name', value_name='id') }}"
+  when: bundles_kind == 'user'

@@ -16,6 +16,7 @@ bundles_state:
     values:
       - name: Submitted
         is_resolved: false
+        color_id: "2"
       - name: Open
         is_resolved: false
       - name: Fixed

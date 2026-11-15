@@ -1,5 +1,7 @@
 ---
 bundles_path: /api/admin/customFieldSettings/bundles
+bundles_users_path: /api/users
+bundles_groups_path: /api/groups
 
 # Entries requested per page. Pages are read until one comes back empty, so a list longer than one page is read in full.
 bundles_page_size: 100
@@ -7,11 +9,31 @@ bundles_page_size: 100
 # Most entries that one list read may return. A list that reaches this limit stops the run instead of being cut short.
 bundles_read_limit: 10000
 
-# REST type names of each bundle kind. Both names are the $type values in the documented samples.
+# Per bundle kind: path is the segment after bundles_path, bundle_type is the $type of a new bundle, and value_fields
+# is the fields list of its values. The type names are the $type values in the documented samples.
 bundles_kinds:
   enum:
+    path: enum
     bundle_type: EnumBundle
     value_fields: "id,name,ordinal,description,color(id)"
   state:
+    path: state
     bundle_type: StateBundle
-    value_fields: "id,name,ordinal,description,isResolved"
+    value_fields: "id,name,ordinal,description,isResolved,color(id)"
+  version:
+    path: version
+    bundle_type: VersionBundle
+    value_fields: "id,name,ordinal,description,releaseDate,released,archived,color(id)"
+  build:
+    path: build
+    bundle_type: BuildBundle
+    value_fields: "id,name,ordinal,description,assembleDate,color(id)"
+  owned:
+    path: ownedField
+    bundle_type: OwnedBundle
+    value_fields: "id,name,ordinal,description,owner(id,login),color(id)"
+  user:
+    path: user
+    bundle_type: UserBundle
+    # A user bundle holds members instead of values, so its bundle read names the members.
+    bundle_fields: "groups(id,name),individuals(id,login)"

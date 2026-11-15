@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Ensure YouTrack enum and state bundles exist with the declared values.
+    short_description: Ensure YouTrack enum, state, version, build, owned and user bundles exist with declared values.
     options:
       youtrack_url:
         type: str
@@ -76,6 +76,158 @@ argument_specs:
                 type: bool
                 required: true
                 description: Whether an issue in this state counts as resolved.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "2". Left as it is when omitted.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.
+      bundles_version:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          Version bundles to ensure. A missing bundle is created, and a missing value is added. Values that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Each value is matched by its name within the bundle.
+            options:
+              name:
+                type: str
+                required: true
+                description: Name of the value.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "1". Left as it is when omitted.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.
+              released:
+                type: bool
+                required: false
+                description: Whether the version is released. Left as it is when omitted.
+              archived:
+                type: bool
+                required: false
+                description: >-
+                  Whether the version is archived. Archiving sets a flag and deletes nothing. Left as it is when
+                  omitted.
+              release_date:
+                type: int
+                required: false
+                description: >-
+                  Release date as epoch milliseconds in UTC, for example 1576367999999. Left as it is when omitted.
+      bundles_build:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          Build bundles to ensure. A missing bundle is created, and a missing value is added. Values that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Each value is matched by its name within the bundle.
+            options:
+              name:
+                type: str
+                required: true
+                description: Name of the value.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "1". Left as it is when omitted.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.
+              assemble_date:
+                type: int
+                required: false
+                description: >-
+                  Assembly date as epoch milliseconds in UTC, for example 1627636495000. Left as it is when omitted.
+      bundles_user:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          User bundles to ensure. A missing bundle is created, and a missing member is added. Members that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          users:
+            type: list
+            elements: str
+            required: false
+            description: >-
+              Logins of the users that the bundle must contain. Each login must name an existing user.
+          groups:
+            type: list
+            elements: str
+            required: false
+            description: >-
+              Names of the groups that the bundle must contain. Each name must name an existing group.
+      bundles_owned:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          Owned bundles to ensure. A missing bundle is created, and a missing value is added. Values that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Each value is matched by its name within the bundle.
+            options:
+              name:
+                type: str
+                required: true
+                description: Name of the value.
+              owner:
+                type: str
+                required: false
+                description: >-
+                  Login of the user who owns the value. The login must name an existing user.
+                  Left as it is when omitted.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "1". Left as it is when omitted.
               description:
                 type: str
                 required: false
