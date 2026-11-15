@@ -77,6 +77,40 @@
         error: "name found in custom_fields_declared"
         provided: >-
           {{ argspec_connection | combine({'custom_fields_declared': [{'field_type': 'string'}]}) }}
+      - name: custom_fields accepts a project override with a bundle and an empty-value setting
+        role: custom_fields
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [
+              {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types', 'projects': ['DEMO'],
+               'project_overrides': [{'project': 'SAMPLE', 'bundle': 'Kinds', 'can_be_empty': false}]}]}) }}
+      - name: custom_fields accepts a project override that names only a project
+        role: custom_fields
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [
+              {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types',
+               'project_overrides': [{'project': 'SAMPLE'}]}]}) }}
+      - name: custom_fields rejects a project override without a project
+        role: custom_fields
+        expect: fail
+        error: "project found in custom_fields_declared -> project_overrides"
+        provided: >-
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [
+              {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types',
+               'project_overrides': [{'bundle': 'Kinds'}]}]}) }}
+      - name: custom_fields rejects a non-boolean empty-value setting in a project override
+        role: custom_fields
+        expect: fail
+        error: "can_be_empty"
+        provided: >-
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [
+              {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types',
+               'project_overrides': [{'project': 'SAMPLE', 'can_be_empty': 'sometimes'}]}]}) }}
       - name: link_types accepts a complete link type
         role: link_types
         expect: pass
