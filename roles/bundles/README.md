@@ -1,6 +1,6 @@
 # bundles
 
-Ensures enum, state and version bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+Ensures enum, state, version and build bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
 missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
@@ -36,6 +36,7 @@ roles:
 | `bundles_enum` | list of dict | No | `[]` | Enum bundles to ensure. |
 | `bundles_state` | list of dict | No | `[]` | State bundles to ensure. |
 | `bundles_version` | list of dict | No | `[]` | Version bundles to ensure. |
+| `bundles_build` | list of dict | No | `[]` | Build bundles to ensure. |
 
 Each entry of `bundles_enum` has:
 
@@ -67,12 +68,22 @@ Each entry of `bundles_version` has:
   - `release_date` (int, optional): the release date as epoch milliseconds in UTC, for example `1576367999999`. Left as
     it is when omitted.
 
+Each entry of `bundles_build` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+  - `assemble_date` (int, optional): the assembly date as epoch milliseconds in UTC, for example `1627636495000`. Left
+    as it is when omitted.
+
 ## Behavior
 
 - Creates a missing bundle empty, then adds each declared value to it.
 - Adds a declared value that is missing.
 - Updates a declared value when a declared attribute differs from the stored value: its description, color, resolved
-  flag, release date, released flag or archived flag.
+  flag, release date, released flag, archived flag or assembly date.
 - Leaves values that are not declared as they are.
 - Fails when a bundle declares the same value name twice.
 - Never renames or deletes a bundle or a value.

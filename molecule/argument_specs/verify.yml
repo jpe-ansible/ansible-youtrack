@@ -90,6 +90,25 @@
         provided: >-
           {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases',
             'values': [{'name': '1.0', 'release_date': 'soon'}]}]}) }}
+      - name: bundles accepts a build bundle with its value attributes
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds', 'values': [
+            {'name': '1.0.0', 'description': 'Release build', 'color_id': '4', 'assemble_date': 1627636495000}]}]}) }}
+      - name: bundles rejects a build value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_build -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds', 'values': [{'description': 'x'}]}]}) }}
+      - name: bundles rejects an assembly date that is not a number
+        role: bundles
+        expect: fail
+        error: "assemble_date"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds',
+            'values': [{'name': '1.0.0', 'assemble_date': 'soon'}]}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

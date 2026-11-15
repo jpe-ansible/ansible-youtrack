@@ -23,3 +23,10 @@
   vars:
     bundles_kind: version
     bundles_declared: "{{ bundles_version | default([]) }}"
+
+- name: Ensure the build bundles match the declared bundles
+  ansible.builtin.include_tasks: kind.yml
+  when: bundles_build | default([]) | length > 0
+  vars:
+    bundles_kind: build
+    bundles_declared: "{{ bundles_build | default([]) }}"

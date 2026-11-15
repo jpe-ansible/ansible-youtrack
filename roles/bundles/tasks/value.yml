@@ -80,6 +80,10 @@
          + (['archived']
           if bundles_value.archived is defined
           and bundles_value.archived != (bundles_value_target.archived | default(false, true))
+          else [])
+         + (['assembleDate']
+          if bundles_value.assemble_date is defined
+          and (bundles_value.assemble_date | string) != (bundles_value_target.assembleDate | default('', true) | string)
           else []) }}
 
 - name: Update the value when a declared attribute differs
@@ -97,7 +101,9 @@
              | combine({'isResolved': bundles_value.is_resolved} if 'isResolved' in bundles_value_changes else {})
              | combine({'releaseDate': bundles_value.release_date} if 'releaseDate' in bundles_value_changes else {})
              | combine({'released': bundles_value.released} if 'released' in bundles_value_changes else {})
-             | combine({'archived': bundles_value.archived} if 'archived' in bundles_value_changes else {}) }}
+             | combine({'archived': bundles_value.archived} if 'archived' in bundles_value_changes else {})
+             | combine({'assembleDate': bundles_value.assemble_date}
+                       if 'assembleDate' in bundles_value_changes else {}) }}
 
     - name: Report the value that check mode would update
       ansible.builtin.debug:

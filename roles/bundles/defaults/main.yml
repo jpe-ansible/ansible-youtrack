@@ -18,3 +18,6 @@ bundles_kinds:
   version:
     bundle_type: VersionBundle
     value_fields: "id,name,ordinal,description,releaseDate,released,archived,color(id)"
+  build:
+    bundle_type: BuildBundle
+    value_fields: "id,name,ordinal,description,assembleDate,color(id)"

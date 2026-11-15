@@ -1,7 +1,7 @@
 ---
 argument_specs:
   main:
-    short_description: Ensure YouTrack enum, state and version bundles exist with the declared values.
+    short_description: Ensure YouTrack enum, state, version and build bundles exist with the declared values.
     options:
       youtrack_url:
         type: str
@@ -132,3 +132,40 @@ argument_specs:
                 required: false
                 description: >-
                   Release date as epoch milliseconds in UTC, for example 1576367999999. Left as it is when omitted.
+      bundles_build:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: >-
+          Build bundles to ensure. A missing bundle is created, and a missing value is added. Values that are not
+          declared stay as they are. Nothing is removed.
+        options:
+          name:
+            type: str
+            required: true
+            description: Name of the bundle. The bundle is matched by this name.
+          values:
+            type: list
+            elements: dict
+            required: true
+            description: Values the bundle must contain. Each value is matched by its name within the bundle.
+            options:
+              name:
+                type: str
+                required: true
+                description: Name of the value.
+              color_id:
+                type: str
+                required: false
+                description: >-
+                  Color of the value as a palette index, for example "1". Left as it is when omitted.
+              description:
+                type: str
+                required: false
+                description: Description of the value. Left as it is when omitted.
+              assemble_date:
+                type: int
+                required: false
+                description: >-
+                  Assembly date as epoch milliseconds in UTC, for example 1627636495000. Left as it is when omitted.
