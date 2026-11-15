@@ -1,6 +1,6 @@
 # AI Agents Configuration
 
-Ansible collection `jpe_ansible.youtrack` declares YouTrack enum and state bundles, global custom fields and issue link
+Ansible collection `jpe_ansible.youtrack` declares YouTrack enum, state, version, build, owned and user bundles, global custom fields and issue link
 types as code.
 
 ## Rules

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.4.0...v0.5.0) (2026-11-15)
+
+
+### Features
+
+* **bundles:** declare version, owned, build and user bundles and state colors ([#20](https://github.com/jpe-ansible/ansible-youtrack/issues/20)) ([c5b43d2](https://github.com/jpe-ansible/ansible-youtrack/commit/c5b43d206b82d491d7edc35f3c5e852c4e56fa6c))
+
 ## [0.4.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.3.0...v0.4.0) (2026-11-15)
 
 

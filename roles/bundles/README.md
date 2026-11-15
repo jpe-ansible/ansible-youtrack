@@ -1,6 +1,6 @@
 # bundles
 
-Ensures enum and state bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
+Ensures enum, state, version, build, owned and user bundles exist in YouTrack with their declared values. It creates a missing bundle and adds a
 missing value. It updates a declared value when its description, color or resolved flag differs.
 
 ## Usage
@@ -35,6 +35,10 @@ roles:
 | `youtrack_validate_certs` | bool | No | `true` | Verify the server certificate. Set to `false` only for a test server with a self-signed certificate. |
 | `bundles_enum` | list of dict | No | `[]` | Enum bundles to ensure. |
 | `bundles_state` | list of dict | No | `[]` | State bundles to ensure. |
+| `bundles_version` | list of dict | No | `[]` | Version bundles to ensure. |
+| `bundles_build` | list of dict | No | `[]` | Build bundles to ensure. |
+| `bundles_owned` | list of dict | No | `[]` | Owned bundles to ensure. |
+| `bundles_user` | list of dict | No | `[]` | User bundles to ensure. |
 
 Each entry of `bundles_enum` has:
 
@@ -50,15 +54,63 @@ Each entry of `bundles_state` has:
 - `values` (list of dict, required): the values the bundle must contain. Each value has:
   - `name` (str, required): the value name. The value is matched by this name within its bundle.
   - `is_resolved` (bool, required): whether an issue in this state counts as resolved.
+  - `color_id` (str, optional): a palette index, for example `"2"`. Left as it is when omitted.
   - `description` (str, optional): the value description. Left as it is when omitted.
+
+Each entry of `bundles_version` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+  - `released` (bool, optional): whether the version is released. Left as it is when omitted.
+  - `archived` (bool, optional): whether the version is archived. Archiving sets a flag and deletes nothing. Left as it
+    is when omitted.
+  - `release_date` (int, optional): the release date as epoch milliseconds in UTC, for example `1576367999999`. Left as
+    it is when omitted.
+
+Each entry of `bundles_build` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+  - `assemble_date` (int, optional): the assembly date as epoch milliseconds in UTC, for example `1627636495000`. Left
+    as it is when omitted.
+
+Each entry of `bundles_owned` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `values` (list of dict, required): the values the bundle must contain. Each value has:
+  - `name` (str, required): the value name. The value is matched by this name within its bundle.
+  - `owner` (str, optional): the login of the user who owns the value. The login must name an existing user. Left as it
+    is when omitted.
+  - `description` (str, optional): the value description. Left as it is when omitted.
+  - `color_id` (str, optional): a palette index, for example `"1"`. Left as it is when omitted.
+
+Each entry of `bundles_user` has:
+
+- `name` (str, required): the bundle name. The bundle is matched by this name.
+- `users` (list of str, optional): the logins of the users that the bundle must contain. Each login must name an
+  existing user.
+- `groups` (list of str, optional): the names of the groups that the bundle must contain. Each name must name an
+  existing group.
+
+A user bundle holds members, not values, so it takes no `values` list. A member is added by its id, which the role
+looks up by login or group name.
 
 ## Behavior
 
-- Creates a missing bundle empty, then adds each declared value to it.
-- Adds a declared value that is missing.
-- Updates a declared value when its description, color or resolved flag differs from the declaration.
+- Creates a missing bundle empty, then adds each declared value or member to it.
+- Adds a declared value or member that is missing.
+- Updates a declared value when a declared attribute differs from the stored value: its description, color, resolved
+  flag, release date, released flag, archived flag or assembly date.
 - Leaves values that are not declared as they are.
 - Fails when a bundle declares the same value name twice.
+- Stops before any write for a bundle when a declared owner login, user login or group name is not known.
+- Never removes a member of a user bundle.
 - Never renames or deletes a bundle or a value.
 - In check mode, reports each bundle, value and update it would change, and makes no write request.
 

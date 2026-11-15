@@ -49,6 +49,110 @@
         provided: >-
           {{ argspec_connection | combine({'bundles_state':
             [{'name': 'States', 'values': [{'name': 'Submitted'}]}]}) }}
+      - name: bundles accepts a color on a state value
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_state':
+            [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false, 'color_id': '2'}]}]}) }}
+      - name: bundles rejects a state value with a color key other than color_id
+        role: bundles
+        expect: fail
+        error: "color"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_state':
+            [{'name': 'States', 'values': [{'name': 'Submitted', 'is_resolved': false, 'color': '2'}]}]}) }}
+      - name: bundles accepts a version bundle with its value attributes
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases', 'values': [
+            {'name': '1.0', 'description': 'First release', 'color_id': '2', 'released': true,
+             'archived': false, 'release_date': 1576367999999}]}]}) }}
+      - name: bundles rejects a version value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_version -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version':
+            [{'name': 'Releases', 'values': [{'description': 'x'}]}]}) }}
+      - name: bundles rejects a non-boolean released flag on a version value
+        role: bundles
+        expect: fail
+        error: "released"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases',
+            'values': [{'name': '1.0', 'released': 'sometimes'}]}]}) }}
+      - name: bundles rejects a release date that is not a number
+        role: bundles
+        expect: fail
+        error: "release_date"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_version': [{'name': 'Releases',
+            'values': [{'name': '1.0', 'release_date': 'soon'}]}]}) }}
+      - name: bundles accepts a build bundle with its value attributes
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds', 'values': [
+            {'name': '1.0.0', 'description': 'Release build', 'color_id': '4', 'assemble_date': 1627636495000}]}]}) }}
+      - name: bundles rejects a build value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_build -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds', 'values': [{'description': 'x'}]}]}) }}
+      - name: bundles rejects an assembly date that is not a number
+        role: bundles
+        expect: fail
+        error: "assemble_date"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_build': [{'name': 'Builds',
+            'values': [{'name': '1.0.0', 'assemble_date': 'soon'}]}]}) }}
+      - name: bundles accepts an owned bundle with an owner on a value
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners', 'values': [
+            {'name': 'Core', 'owner': 'jane.doe', 'color_id': '3', 'description': 'Core team'}]}]}) }}
+      - name: bundles rejects an owned value without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_owned -> values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners', 'values': [{'owner': 'jane.doe'}]}]}) }}
+      - name: bundles rejects an owned bundle without values
+        role: bundles
+        expect: fail
+        error: "values found in bundles_owned"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_owned': [{'name': 'Owners'}]}) }}
+      - name: bundles accepts a user bundle with users and groups
+        role: bundles
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams', 'users': ['jane.doe'],
+            'groups': ['Developers']}]}) }}
+      - name: bundles rejects a user bundle without a name
+        role: bundles
+        expect: fail
+        error: "name found in bundles_user"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'users': ['jane.doe']}]}) }}
+      - name: bundles rejects values on a user bundle
+        role: bundles
+        expect: fail
+        error: "values"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams',
+            'values': [{'name': 'x'}]}]}) }}
+      - name: bundles rejects a users entry that is a mapping and not a list
+        role: bundles
+        expect: fail
+        error: "users"
+        provided: >-
+          {{ argspec_connection | combine({'bundles_user': [{'name': 'Teams',
+            'users': {'login': 'jane.doe'}}]}) }}
       - name: bundles rejects a non-boolean certificate flag
         role: bundles
         expect: fail

@@ -4,6 +4,36 @@
     that:
       - bundles_item['values'] | map(attribute='name') | unique | list | length == bundles_item['values'] | length
     fail_msg: "Bundle {{ bundles_item.name }} declares a value name more than once. Each value name must be unique."
+  when: bundles_kind != 'user'
+
+# Every declared owner login must be a known user. The check runs before any write for this bundle.
+- name: List the declared owner logins that the server does not know
+  ansible.builtin.set_fact:
+    bundles_unknown_owners: >-
+      {{ bundles_item['values'] | selectattr('owner', 'defined') | map(attribute='owner') | list
+         | difference(bundles_user_ids.keys() | list) }}
+  when: bundles_kind == 'owned'
+
+- name: Stop when a declared owner is not a known user
+  ansible.builtin.assert:
+    that:
+      - bundles_unknown_owners | length == 0
+    fail_msg: >-
+      The {{ bundles_kind }} bundle {{ bundles_item.name }} names an owner login that the server does not know:
+      {{ bundles_unknown_owners | join(', ') }}.
+  when: bundles_kind == 'owned'
+
+# Every declared member must be a known user or group. The check runs before any write for this bundle.
+- name: Stop when a declared user or group is not known
+  ansible.builtin.assert:
+    that:
+      - bundles_item.get('users', []) | difference(bundles_user_ids.keys() | list) | length == 0
+      - bundles_item.get('groups', []) | difference(bundles_group_ids.keys() | list) | length == 0
+    fail_msg: >-
+      The user bundle {{ bundles_item.name }} names a login or group name that the server does not know:
+      {{ (bundles_item.get('users', []) | difference(bundles_user_ids.keys() | list)
+          + bundles_item.get('groups', []) | difference(bundles_group_ids.keys() | list)) | join(', ') }}.
+  when: bundles_kind == 'user'
 
 - name: Find the current bundle
   ansible.builtin.set_fact:
@@ -26,7 +56,7 @@
     # The create body names the bundle and its $type and sends no values. Each value is added by its own request below.
     - name: Request the new bundle
       ansible.builtin.uri:
-        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kind }}?fields=id,name"
+        url: "{{ youtrack_url }}{{ bundles_path }}/{{ bundles_kinds[bundles_kind].path }}?fields=id,name"
         method: POST
         headers:
           Accept: application/json
@@ -57,7 +87,31 @@
 
 - name: Ensure each declared value of the bundle exists with its attributes
   ansible.builtin.include_tasks: value.yml
-  loop: "{{ bundles_item['values'] }}"
+  loop: "{{ bundles_item.get('values', []) }}"
   loop_control:
     loop_var: bundles_value
     label: "{{ bundles_value.name }}"
+
+- name: Ensure each declared user is a member of the user bundle
+  ansible.builtin.include_tasks: member.yml
+  loop: "{{ bundles_item.get('users', []) }}"
+  loop_control:
+    loop_var: bundles_member
+    label: "user {{ bundles_member }}"
+  vars:
+    bundles_member_ids: "{{ bundles_user_ids }}"
+    bundles_member_collection: individuals
+    bundles_member_noun: user
+  when: bundles_kind == 'user'
+
+- name: Ensure each declared group is a member of the user bundle
+  ansible.builtin.include_tasks: member.yml
+  loop: "{{ bundles_item.get('groups', []) }}"
+  loop_control:
+    loop_var: bundles_member
+    label: "group {{ bundles_member }}"
+  vars:
+    bundles_member_ids: "{{ bundles_group_ids }}"
+    bundles_member_collection: groups
+    bundles_member_noun: group
+  when: bundles_kind == 'user'
