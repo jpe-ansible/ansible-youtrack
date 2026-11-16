@@ -56,7 +56,8 @@ The example playbook is in [`examples/site.yml`](examples/site.yml). Its declara
     - jpe_ansible.youtrack.bundles
 ```
 
-Run the bundles role before the custom fields role. An enum or state field uses a bundle, so the bundle must exist.
+Run the bundles role before the custom fields role. A bundle-backed field (enum, state, version, build, ownedField or
+user) uses a bundle, so the bundle must exist.
 
 ## Roles
 
@@ -126,8 +127,8 @@ The run stops at the item that fails. Items handled earlier in the same run keep
 cases:
 
 - A custom field exists with another field type. The role never changes a field type.
-- A custom field that is not an enum or state field declares `can_be_empty: false`. Only enum and state fields have
-  this setting.
+- A custom field that is not a bundle-backed field declares `can_be_empty: false`. Only bundle-backed fields (enum,
+  state, version, build, ownedField and user) have this setting.
 - An attachment uses another bundle than the declaration. The role never changes the bundle of an attachment.
 - A named bundle or project does not exist.
 - A bundle declares the same value name twice.

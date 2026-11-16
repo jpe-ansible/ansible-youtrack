@@ -45,14 +45,24 @@ argument_specs:
               - enum[1]
               - enum[*]
               - state[1]
+              - version[1]
+              - version[*]
+              - build[1]
+              - build[*]
+              - ownedField[1]
+              - ownedField[*]
+              - user[1]
+              - user[*]
             description: >-
-              Field type. An enum or state field needs a bundle. The type of an existing field is never changed.
+              Field type. An enum, state, version, build, ownedField or user field needs a bundle. The type of an
+              existing field is never changed.
           bundle:
             type: str
             required: false
             description: >-
-              Name of an existing enum or state bundle. It is the default bundle of a new field. Each attachment must
-              use it, unless its project has a project_overrides entry with its own bundle.
+              Name of an existing bundle of the field's kind: enum, state, version, build, ownedField or user. It is the
+              default bundle of a new field. Each attachment must use it, unless its project has a project_overrides
+              entry with its own bundle.
           projects:
             type: list
             elements: str
@@ -66,9 +76,9 @@ argument_specs:
             required: false
             default: true
             description: >-
-              Whether an issue in each attached project may leave the field empty. Only an enum or state field takes
-              false. The role stops when a field of another type declares false. A project_overrides entry can set
-              its own value.
+              Whether an issue in each attached project may leave the field empty. Only a bundle-backed field takes
+              false: enum, state, version, build, ownedField or user. The role stops when a field of another type
+              declares false. A project_overrides entry can set its own value.
           project_overrides:
             type: list
             elements: dict
@@ -87,9 +97,9 @@ argument_specs:
                 type: str
                 required: false
                 description: >-
-                  Name of an existing bundle of the same kind as the field. Only an enum or state field takes a bundle.
+                  Name of an existing bundle of the same kind as the field. Only a bundle-backed field takes a bundle.
               can_be_empty:
                 type: bool
                 required: false
                 description: >-
-                  Whether an issue in this project may leave the field empty. Only an enum or state field takes false.
+                  Whether an issue in this project may leave the field empty. Only a bundle-backed field takes false.

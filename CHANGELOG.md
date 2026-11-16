@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.5.0...v0.6.0) (2026-11-16)
+
+
+### Features
+
+* **custom_fields:** accept build, owned, user and version field types ([#23](https://github.com/jpe-ansible/ansible-youtrack/issues/23)) ([8aef209](https://github.com/jpe-ansible/ansible-youtrack/commit/8aef20995eb7a2a40a0b9cfd989d0854e90ea0f3))
+
 ## [0.5.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.4.0...v0.5.0) (2026-11-15)
 
 

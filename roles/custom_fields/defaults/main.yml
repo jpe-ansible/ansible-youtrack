@@ -21,8 +21,20 @@ custom_fields_project_types:
   enum[1]: EnumProjectCustomField
   enum[*]: EnumProjectCustomField
   state[1]: StateProjectCustomField
+  build[1]: BuildProjectCustomField
+  build[*]: BuildProjectCustomField
+  ownedField[1]: OwnedProjectCustomField
+  ownedField[*]: OwnedProjectCustomField
+  user[1]: UserProjectCustomField
+  user[*]: UserProjectCustomField
+  version[1]: VersionProjectCustomField
+  version[*]: VersionProjectCustomField
 
 # Bundle $type of each bundle-backed kind. The kind is the field type without its cardinality suffix.
 custom_fields_bundle_types:
   enum: EnumBundle
   state: StateBundle
+  build: BuildBundle
+  ownedField: OwnedBundle
+  user: UserBundle
+  version: VersionBundle
