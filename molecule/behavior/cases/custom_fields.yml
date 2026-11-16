@@ -265,7 +265,9 @@
         - name: Confirm the refusal explains the setting and omits the key
           ansible.builtin.assert:
             that:
-              - "'Only an enum or state field can be set so that it cannot be empty.' in ansible_failed_result.msg"
+              - >-
+                'Only an enum, state, version, build, ownedField or user field can be set so that it cannot be empty.'
+                in ansible_failed_result.msg
               - "youtrack_api_key not in ansible_failed_result.msg"
             fail_msg: "The refusal message is not the expected one."
     - name: Read the journal
@@ -933,3 +935,270 @@
         that:
           - stub_writes | length == 0
         fail_msg: "The refused missing override bundle case sent writes."
+
+- name: Case custom_fields - a version field is created with its default version bundle, attached and set canBeEmpty
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing version field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "11-1", name: Releases}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "58-2", name: Fix versions, fieldType: {id: "version[1]"}}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields/58-2/fieldDefaults}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "59-2"}}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "60-2"
+                canBeEmpty: true
+                field: {id: "58-2", name: Fix versions}
+                bundle: {id: "11-1", name: Releases}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields/60-2}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "60-2", canBeEmpty: false}}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with a version field
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Fix versions
+            field_type: version[1]
+            bundle: Releases
+            projects: [DEMO]
+            can_be_empty: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the four writes in order
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 4
+          - >-
+            stub_writes[0].request.url.startswith('/api/admin/customFieldSettings/customFields?fields=')
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Fix versions', 'fieldType': {'id': 'version[1]'}, 'isAutoAttached': false}
+          - >-
+            stub_writes[1].request.url.startswith(
+            '/api/admin/customFieldSettings/customFields/58-2/fieldDefaults')
+          - >-
+            stub_writes[1].request.body | from_json ==
+            {'bundle': {'id': '11-1', '$type': 'VersionBundle'}}
+          - >-
+            stub_writes[2].request.url.startswith('/api/admin/projects/0-1/customFields?fields=')
+          - >-
+            stub_writes[2].request.body | from_json ==
+            {'field': {'id': '58-2'}, '$type': 'VersionProjectCustomField'}
+          - >-
+            stub_writes[3].request.url.startswith('/api/admin/projects/0-1/customFields/60-2?fields=')
+          - "stub_writes[3].request.body | from_json == {'canBeEmpty': false}"
+        fail_msg: "The version field case sent unexpected writes."
+
+- name: Case custom_fields - a second run with the attached version field sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for the attached version field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "11-1", name: Releases}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/version
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: "58-2", name: Fix versions, fieldType: {id: "version[1]"}}]
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - id: "60-2"
+                  canBeEmpty: false
+                  field: {id: "58-2", name: Fix versions}
+                  bundle: {id: "11-1", name: Releases}
+          - request:
+              method: GET
+              urlPath: /api/admin/projects/0-1/customFields
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with the version field
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Fix versions
+            field_type: version[1]
+            bundle: Releases
+            projects: [DEMO]
+            can_be_empty: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert no writes were sent
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 0
+        fail_msg: "A second run with the same version field sent writes."
+
+- name: Case custom_fields - a multi-value build field is created, attached with its build bundle and set canBeEmpty
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing build field
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/enum
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/state
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/build
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "12-1", name: Builds}]}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/bundles/build
+              queryParameters: {"$skip": {equalTo: "1"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "0"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: [{id: "0-1", shortName: DEMO}]}
+          - request: {method: GET, urlPath: /api/admin/projects, queryParameters: {"$skip": {equalTo: "1"}}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request:
+              method: GET
+              urlPath: /api/admin/customFieldSettings/customFields
+              queryParameters: {"$skip": {equalTo: "0"}}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {id: "58-3", name: Fixed in build, fieldType: {id: "build[*]"}}
+          - request: {method: POST, urlPath: /api/admin/customFieldSettings/customFields/58-3/fieldDefaults}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "59-3"}}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                id: "60-3"
+                canBeEmpty: true
+                field: {id: "58-3", name: Fixed in build}
+                bundle: {id: "12-1", name: Builds}
+          - request: {method: POST, urlPath: /api/admin/projects/0-1/customFields/60-3}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: {id: "60-3", canBeEmpty: false}}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the custom_fields role with a multi-value build field
+      ansible.builtin.include_role:
+        name: custom_fields
+      vars:
+        custom_fields_declared:
+          - name: Fixed in build
+            field_type: build[*]
+            bundle: Builds
+            projects: [DEMO]
+            can_be_empty: false
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the four writes in order
+      ansible.builtin.assert:
+        that:
+          - stub_writes | length == 4
+          - >-
+            stub_writes[0].request.url.startswith('/api/admin/customFieldSettings/customFields?fields=')
+          - >-
+            stub_writes[0].request.body | from_json ==
+            {'name': 'Fixed in build', 'fieldType': {'id': 'build[*]'}, 'isAutoAttached': false}
+          - >-
+            stub_writes[1].request.url.startswith(
+            '/api/admin/customFieldSettings/customFields/58-3/fieldDefaults')
+          - >-
+            stub_writes[1].request.body | from_json ==
+            {'bundle': {'id': '12-1', '$type': 'BuildBundle'}}
+          - >-
+            stub_writes[2].request.url.startswith('/api/admin/projects/0-1/customFields?fields=')
+          - >-
+            stub_writes[2].request.body | from_json ==
+            {'field': {'id': '58-3'}, '$type': 'BuildProjectCustomField'}
+          - >-
+            stub_writes[3].request.url.startswith('/api/admin/projects/0-1/customFields/60-3?fields=')
+          - "stub_writes[3].request.body | from_json == {'canBeEmpty': false}"
+        fail_msg: "The build field case sent unexpected writes."

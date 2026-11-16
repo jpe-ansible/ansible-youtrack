@@ -80,7 +80,7 @@
 # The attach body is the documented one: the field id and the attachment type. A project named in project_overrides
 # also sends its bundle, so its attachment takes that bundle. Any other attachment takes the field default.
 # A bundle that differs from the declaration stops the run.
-# canBeEmpty of an enum or state attachment is set afterwards when it differs, because the documented attach body has
+# canBeEmpty of a bundle-backed attachment is set afterwards when it differs, because the documented attach body has
 # no canBeEmpty. A field of another type has no empty-value setting.
 - name: Attach the custom field to the project when it is not attached
   when: custom_fields_attachment.id is not defined

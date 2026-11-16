@@ -28,6 +28,39 @@
     custom_fields_read_what: state bundles
     custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/state?fields=id,name"
 
+# A bundle kind is read only when a declared field uses it, so a run without such a field reads nothing more.
+- name: Read the version bundles
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | selectattr('field_type', 'match', '^version') | list | length > 0
+  vars:
+    custom_fields_read_key: version_bundles
+    custom_fields_read_what: version bundles
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/version?fields=id,name"
+
+- name: Read the build bundles
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | selectattr('field_type', 'match', '^build') | list | length > 0
+  vars:
+    custom_fields_read_key: build_bundles
+    custom_fields_read_what: build bundles
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/build?fields=id,name"
+
+- name: Read the owned bundles
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | selectattr('field_type', 'match', '^ownedField') | list | length > 0
+  vars:
+    custom_fields_read_key: ownedField_bundles
+    custom_fields_read_what: owned bundles
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/ownedField?fields=id,name"
+
+- name: Read the user bundles
+  ansible.builtin.include_tasks: read_list.yml
+  when: custom_fields_declared | default([]) | selectattr('field_type', 'match', '^user') | list | length > 0
+  vars:
+    custom_fields_read_key: user_bundles
+    custom_fields_read_what: user bundles
+    custom_fields_read_url: "{{ youtrack_url }}{{ custom_fields_bundles_path }}/user?fields=id,name"
+
 - name: Read the projects
   ansible.builtin.include_tasks: read_list.yml
   when: custom_fields_declared | default([]) | length > 0

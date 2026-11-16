@@ -20,8 +20,8 @@
       - custom_fields_kind in custom_fields_bundle_types or custom_fields_can_be_empty
     fail_msg: >-
       Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which has no
-      empty-value setting. Only an enum or state field can be set so that it cannot be empty. A workflow rule can
-      make a field of this type required.
+      empty-value setting. Only an enum, state, version, build, ownedField or user field can be set so that it
+      cannot be empty. A workflow rule can make a field of this type required.
 
 - name: Check that only a bundle-backed field names a bundle in a project override
   ansible.builtin.assert:
@@ -42,8 +42,8 @@
         | selectattr('can_be_empty', 'equalto', false) | list | length == 0)
     fail_msg: >-
       Custom field {{ custom_fields_item.name }} has type {{ custom_fields_item.field_type }}, which has no empty-value
-      setting. Remove can_be_empty: false from its project_overrides entries. Only an enum or state field can be set so
-      that it cannot be empty.
+      setting. Remove can_be_empty: false from its project_overrides entries. Only an enum, state, version, build,
+      ownedField or user field can be set so that it cannot be empty.
 
 - name: Check that each project appears once in the project overrides
   ansible.builtin.assert:
