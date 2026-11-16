@@ -168,13 +168,23 @@
               {'name': 'Type', 'field_type': 'enum[1]', 'bundle': 'Types',
                'projects': ['DEMO'], 'can_be_empty': false},
               {'name': 'Due Date', 'field_type': 'date'}]}) }}
-      - name: custom_fields rejects an unknown field type
+      - name: custom_fields accepts the version, build, owned and user field types
+        role: custom_fields
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({
+            'custom_fields_declared': [
+              {'name': 'Fix versions', 'field_type': 'version[*]', 'bundle': 'Releases'},
+              {'name': 'Fixed in build', 'field_type': 'build[1]', 'bundle': 'Builds'},
+              {'name': 'Owner', 'field_type': 'ownedField[*]', 'bundle': 'Owners'},
+              {'name': 'Assignee', 'field_type': 'user[1]', 'bundle': 'Assignees', 'can_be_empty': false}]}) }}
+      - name: custom_fields rejects a field type without a cardinality
         role: custom_fields
         expect: fail
         error: "field_type"
         provided: >-
           {{ argspec_connection | combine({
-            'custom_fields_declared': [{'name': 'Assignee', 'field_type': 'user[1]'}]}) }}
+            'custom_fields_declared': [{'name': 'Assignee', 'field_type': 'user'}]}) }}
       - name: custom_fields rejects a field without a name
         role: custom_fields
         expect: fail
