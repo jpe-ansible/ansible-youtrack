@@ -17,3 +17,5 @@
       ansible.builtin.include_tasks: cases/link_types.yml
     - name: Run the export cases
       ansible.builtin.include_tasks: cases/export.yml
+    - name: Run the service_tokens cases
+      ansible.builtin.include_tasks: cases/service_tokens.yml

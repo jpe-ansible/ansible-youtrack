@@ -1,0 +1,25 @@
+---
+- name: Initialize the service token outputs and scope
+  ansible.builtin.set_fact:
+    service_tokens_minted: {}
+    service_tokens_present: []
+    service_tokens_resolved_service_id: "{{ service_tokens_hub_service_id | default('') }}"
+  no_log: true
+
+- name: Stop when declared service token names are not unique
+  ansible.builtin.assert:
+    that:
+      - >-
+        service_tokens_declared | default([]) | map(attribute='name') | unique | list
+        | length == service_tokens_declared | length
+    fail_msg: >-
+      Permanent token names must be unique across service_tokens_declared because service_tokens_minted is keyed by
+      name.
+  when: service_tokens_declared | default([]) | length > 0
+
+- name: Ensure each declared service user permanent token exists
+  ansible.builtin.include_tasks: service_token.yml
+  loop: "{{ service_tokens_declared | default([]) }}"
+  loop_control:
+    loop_var: service_tokens_item
+    label: "{{ service_tokens_item.login }} / {{ service_tokens_item.name }}"
