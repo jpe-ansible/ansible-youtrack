@@ -1,0 +1,49 @@
+---
+argument_specs:
+  main:
+    short_description: Ensure named Hub permanent tokens exist for YouTrack service users.
+    options:
+      youtrack_url:
+        type: str
+        required: true
+        description: Base URL of the YouTrack server, for example https://youtrack.example.com. No trailing slash.
+      youtrack_api_key:
+        type: str
+        required: true
+        no_log: true
+        description: >-
+          Permanent token of a Hub administrator. Sent as a bearer token and never logged.
+      youtrack_validate_certs:
+        type: bool
+        required: false
+        default: true
+        description: Verify the server certificate. Set to false only for a test server with a self-signed certificate.
+      service_tokens_hub_url:
+        type: str
+        required: false
+        description: Hub REST base URL. Defaults to youtrack_url followed by /hub/api/rest. No trailing slash.
+      service_tokens_hub_service_id:
+        type: str
+        required: false
+        description: Hub service ID to use as the scope for new tokens. When set, the role does not list services.
+      service_tokens_declared:
+        type: list
+        elements: dict
+        required: false
+        default: []
+        description: Service user permanent tokens to ensure. Token names must be unique across this list.
+        options:
+          login:
+            type: str
+            required: true
+            description: Login of the existing Hub service user. The role never creates users.
+          name:
+            type: str
+            required: true
+            description: Name of the permanent token. It must be unique for its service user.
+      service_tokens_remint:
+        type: list
+        elements: str
+        required: false
+        default: []
+        description: Names of declared tokens to delete and create again on this run.

@@ -8,3 +8,4 @@
     - jpe_ansible.youtrack.bundles
     - jpe_ansible.youtrack.custom_fields
     - jpe_ansible.youtrack.link_types
+    - jpe_ansible.youtrack.service_tokens

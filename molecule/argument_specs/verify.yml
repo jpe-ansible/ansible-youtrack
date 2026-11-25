@@ -1,5 +1,5 @@
 ---
-- name: Verify the argument specs of the bundles, custom_fields, link_types and export roles
+- name: Verify the argument specs of the bundles, custom_fields, link_types, export and service_tokens roles
   hosts: all
   gather_facts: false
   vars:
@@ -8,6 +8,7 @@
       custom_fields: "{{ argspec_custom_fields.argument_specs.main.options }}"
       link_types: "{{ argspec_link_types.argument_specs.main.options }}"
       export: "{{ argspec_export.argument_specs.main.options }}"
+      service_tokens: "{{ argspec_service_tokens.argument_specs.main.options }}"
     argspec_connection:
       youtrack_url: https://youtrack.example.com
       youtrack_api_key: example-token
@@ -263,6 +264,30 @@
         provided: >-
           {{ argspec_connection | combine({'export_dest': 'youtrack-config.json',
             'youtrack_validate_certs': 'sometimes'}) }}
+      - name: service_tokens accepts a declared service user token
+        role: service_tokens
+        expect: pass
+        provided: >-
+          {{ argspec_connection | combine({'service_tokens_declared':
+            [{'login': 'svc-example', 'name': 'example-automation'}]}) }}
+      - name: service_tokens rejects a declaration without a login
+        role: service_tokens
+        expect: fail
+        error: "login found in service_tokens_declared"
+        provided: >-
+          {{ argspec_connection | combine({'service_tokens_declared': [{'name': 'example-automation'}]}) }}
+      - name: service_tokens rejects a declaration without a name
+        role: service_tokens
+        expect: fail
+        error: "name found in service_tokens_declared"
+        provided: >-
+          {{ argspec_connection | combine({'service_tokens_declared': [{'login': 'svc-example'}]}) }}
+      - name: service_tokens rejects an entry that is not a mapping
+        role: service_tokens
+        expect: fail
+        error: "service_tokens_declared"
+        provided: >-
+          {{ argspec_connection | combine({'service_tokens_declared': ['svc-example']}) }}
 
   tasks:
     - name: Load the bundles argument spec
@@ -284,6 +309,11 @@
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../../roles/export/meta/argument_specs.yml"
         name: argspec_export
+
+    - name: Load the service_tokens argument spec
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../roles/service_tokens/meta/argument_specs.yml"
+        name: argspec_service_tokens
 
     - name: Check each argument spec case
       ansible.builtin.include_tasks: tasks/check_case.yml

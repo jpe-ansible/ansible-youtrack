@@ -1,0 +1,20 @@
+---
+# Run by a case with ansible-playbook, with or without --check. Role inputs are passed as extra variables so failure
+# cases can assert on the child process result while the parent play continues to inspect the stub journal.
+- name: Service tokens role run from a behavior case
+  hosts: localhost
+  gather_facts: false
+  vars:
+    youtrack_url: "{{ lookup('ansible.builtin.env', 'YTC_TEST_URL') }}"
+    youtrack_api_key: "{{ lookup('ansible.builtin.env', 'YTC_TEST_KEY') }}"
+  tasks:
+    - name: Run the service_tokens role
+      ansible.builtin.include_role:
+        name: service_tokens
+
+    - name: Assert the service token output facts
+      ansible.builtin.assert:
+        that:
+          - service_tokens_minted is mapping
+          - service_tokens_present == service_tokens_declared | map(attribute='name') | list
+        fail_msg: "The service_tokens output facts do not match the declared tokens."

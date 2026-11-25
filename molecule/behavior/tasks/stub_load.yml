@@ -6,6 +6,7 @@
     body_format: json
     body: "{{ item }}"
     status_code: 201
+  no_log: true
   loop: "{{ stub_mappings }}"
   loop_control:
     label: "{{ item.request.method }} {{ item.request.urlPath }}"

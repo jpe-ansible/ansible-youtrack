@@ -1,0 +1,4 @@
+---
+service_tokens_hub_url: "{{ youtrack_url }}/hub/api/rest"
+service_tokens_declared: []
+service_tokens_remint: []
