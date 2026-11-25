@@ -1,0 +1,213 @@
+---
+- name: Find the Hub user by login
+  block:
+    - name: Request the Hub user matching the login
+      ansible.builtin.uri:
+        url: >-
+          {{ service_tokens_hub_url }}/users?query=login:%20{{ service_tokens_item.login | urlencode }}&fields=id,login
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: service_tokens_user_response
+  rescue:
+    - name: Stop when the Hub user lookup fails
+      ansible.builtin.fail:
+        msg: >-
+          Finding Hub user {{ service_tokens_item.login }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Stop when the Hub user lookup does not return a list
+  ansible.builtin.assert:
+    that:
+      - service_tokens_user_response.json is sequence
+      - service_tokens_user_response.json is not mapping
+    fail_msg: "Finding Hub user {{ service_tokens_item.login }} returned a response that is not a list."
+
+- name: Keep users with the exact declared login
+  ansible.builtin.set_fact:
+    service_tokens_matching_users: >-
+      {{ service_tokens_user_response.json | selectattr('login', 'equalto', service_tokens_item.login) | list }}
+
+- name: Stop unless exactly one Hub user has the declared login
+  ansible.builtin.assert:
+    that:
+      - service_tokens_matching_users | length == 1
+    fail_msg: >-
+      Expected exactly one Hub user with login {{ service_tokens_item.login }}; found
+      {{ service_tokens_matching_users | length }}. The role does not create users.
+
+- name: Keep the Hub user ID
+  ansible.builtin.set_fact:
+    service_tokens_current_user_id: "{{ service_tokens_matching_users[0].id }}"
+
+- name: Find the YouTrack Hub service when no service ID override is set
+  when: service_tokens_resolved_service_id | length == 0
+  block:
+    - name: Request the Hub service for the YouTrack application
+      ansible.builtin.uri:
+        url: >-
+          {{ service_tokens_hub_url }}/services?query=applicationName:%20YouTrack&fields=id,name,applicationName
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: service_tokens_service_response
+  rescue:
+    - name: Stop when the Hub service lookup fails
+      ansible.builtin.fail:
+        msg: >-
+          Finding the YouTrack Hub service failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Stop unless exactly one Hub service is the YouTrack application
+  ansible.builtin.assert:
+    that:
+      - service_tokens_service_response.json is sequence
+      - service_tokens_service_response.json is not mapping
+      - service_tokens_service_response.json | length == 1
+    fail_msg: >-
+      Expected exactly one Hub service for application YouTrack; found
+      {{ service_tokens_service_response.json | length }}.
+  when: service_tokens_resolved_service_id | length == 0
+
+- name: Keep the YouTrack Hub service ID
+  ansible.builtin.set_fact:
+    service_tokens_resolved_service_id: "{{ service_tokens_service_response.json[0].id }}"
+  when: service_tokens_resolved_service_id | length == 0
+
+- name: List the permanent tokens of the Hub user
+  block:
+    - name: Request permanent token IDs and names
+      ansible.builtin.uri:
+        url: >-
+          {{ service_tokens_hub_url }}/users/{{ service_tokens_current_user_id }}/permanenttokens?fields=id,name
+        method: GET
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        return_content: true
+      check_mode: false
+      no_log: true
+      register: service_tokens_user_tokens_response
+  rescue:
+    - name: Stop when the permanent token list cannot be read
+      ansible.builtin.fail:
+        msg: >-
+          Reading permanent tokens for Hub user {{ service_tokens_item.login }} failed with HTTP status
+          {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Stop when the permanent token lookup does not return a list
+  ansible.builtin.assert:
+    that:
+      - service_tokens_user_tokens_response.json is sequence
+      - service_tokens_user_tokens_response.json is not mapping
+    fail_msg: >-
+      Reading permanent tokens for Hub user {{ service_tokens_item.login }} returned a response that is not a list.
+
+- name: Keep permanent tokens with the declared name
+  ansible.builtin.set_fact:
+    service_tokens_named_tokens: >-
+      {{ service_tokens_user_tokens_response.json | selectattr('name', 'equalto', service_tokens_item.name) | list }}
+
+- name: Stop when the Hub user has duplicate tokens with the declared name
+  ansible.builtin.assert:
+    that:
+      - service_tokens_named_tokens | length <= 1
+    fail_msg: >-
+      Hub user {{ service_tokens_item.login }} has {{ service_tokens_named_tokens | length }} permanent tokens named
+      {{ service_tokens_item.name }}. The role does not guess which token to keep.
+
+- name: Report the token that check mode would create or re-create
+  ansible.builtin.debug:
+    msg: >-
+      Would {{ 're-create' if service_tokens_named_tokens | length == 1 else 'create' }} Hub permanent token
+      {{ service_tokens_item.name }} for service user {{ service_tokens_item.login }}.
+  changed_when: true
+  when:
+    - ansible_check_mode
+    - service_tokens_named_tokens | length == 0 or service_tokens_item.name in (service_tokens_remint | default([]))
+
+- name: Delete the existing permanent token before re-minting it
+  when:
+    - not ansible_check_mode
+    - service_tokens_item.name in (service_tokens_remint | default([]))
+    - service_tokens_named_tokens | length == 1
+  block:
+    - name: Delete the permanent token by ID
+      ansible.builtin.uri:
+        url: >-
+          {{ service_tokens_hub_url }}/users/{{ service_tokens_current_user_id }}/permanenttokens/{{
+          service_tokens_named_tokens[0].id }}
+        method: DELETE
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        status_code: [200, 202, 204]
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+      changed_when: true
+      no_log: true
+  rescue:
+    - name: Stop when the permanent token cannot be deleted
+      ansible.builtin.fail:
+        msg: >-
+          Deleting permanent token {{ service_tokens_item.name }} for Hub user {{ service_tokens_item.login }}
+          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Create the missing or re-minted permanent token
+  when:
+    - not ansible_check_mode
+    - service_tokens_named_tokens | length == 0 or service_tokens_item.name in (service_tokens_remint | default([]))
+  block:
+    - name: Create the permanent token scoped to the YouTrack service
+      ansible.builtin.uri:
+        url: >-
+          {{ service_tokens_hub_url }}/users/{{ service_tokens_current_user_id }}/permanenttokens?fields=id,name,token
+        method: POST
+        headers:
+          Accept: application/json
+          Authorization: "Bearer {{ youtrack_api_key }}"
+        body_format: json
+        body:
+          name: "{{ service_tokens_item.name }}"
+          scope:
+            - id: "{{ service_tokens_resolved_service_id }}"
+        status_code: [200, 201]
+        validate_certs: "{{ youtrack_validate_certs | default(true) }}"
+        return_content: true
+      changed_when: true
+      no_log: true
+      register: service_tokens_created_response
+
+    - name: Stop when Hub does not return the new permanent token value
+      ansible.builtin.assert:
+        that:
+          - service_tokens_created_response.json.token is defined
+          - service_tokens_created_response.json.token | length > 0
+        fail_msg: Hub did not return a value for the new permanent token.
+      no_log: true
+
+    - name: Keep the new permanent token for the calling play
+      ansible.builtin.set_fact:
+        service_tokens_minted: >-
+          {{ service_tokens_minted | combine({service_tokens_item.name: service_tokens_created_response.json.token}) }}
+      no_log: true
+  rescue:
+    - name: Stop when the permanent token cannot be created
+      ansible.builtin.fail:
+        msg: >-
+          Creating permanent token {{ service_tokens_item.name }} for Hub user {{ service_tokens_item.login }}
+          failed with HTTP status {{ ansible_failed_result.status | default('unknown') }}.
+
+- name: Keep the declared permanent token name as present
+  ansible.builtin.set_fact:
+    service_tokens_present: "{{ service_tokens_present + [service_tokens_item.name] }}"

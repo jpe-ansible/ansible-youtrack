@@ -1,0 +1,384 @@
+---
+- name: Case service_tokens - create a missing token and return its value
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a user with no permanent tokens
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/services}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 201
+              headers: "{{ stub_json }}"
+              jsonBody: {id: token-1, name: example-automation, token: stub-token-value-do-not-print}
+        service_tokens_expected_minted: {example-automation: stub-token-value-do-not-print}
+      no_log: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role
+      ansible.builtin.include_role:
+        name: service_tokens
+      vars:
+        service_tokens_declared:
+          - login: svc-example
+            name: example-automation
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the exact create requests, body, and output facts
+      ansible.builtin.assert:
+        that:
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'GET', 'POST']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/services?query=applicationName:%20YouTrack&fields=id,name,applicationName',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name,token']
+          - >-
+            (stub_journal_response.json.requests | reverse | list)[3].request.body | from_json
+            == {'name': 'example-automation', 'scope': [{'id': 'service-1'}]}
+          - service_tokens_minted == service_tokens_expected_minted
+          - service_tokens_present == ['example-automation']
+        fail_msg: "The create case sent unexpected requests or returned unexpected service token facts."
+      no_log: true
+
+- name: Case service_tokens - an existing token is unchanged
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for an existing permanent token
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/services}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: token-1, name: example-automation}]
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role
+      ansible.builtin.include_role:
+        name: service_tokens
+      vars:
+        service_tokens_declared:
+          - login: svc-example
+            name: example-automation
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the exact read requests, no writes, and output facts
+      ansible.builtin.assert:
+        that:
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'GET']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/services?query=applicationName:%20YouTrack&fields=id,name,applicationName',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name']
+          - stub_writes | length == 0
+          - service_tokens_minted == {}
+          - service_tokens_present == ['example-automation']
+        fail_msg: "An unchanged token caused a write or returned unexpected service token facts."
+
+- name: Case service_tokens - re-mint deletes the existing token before creating its replacement
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for the existing token to re-mint
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/services}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: token-1, name: example-automation}]
+          - request: {method: DELETE, urlPath: /hub/api/rest/users/user-1/permanenttokens/token-1}
+            response: {status: 204}
+          - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 201
+              headers: "{{ stub_json }}"
+              jsonBody: {id: token-2, name: example-automation, token: stub-reminted-value-do-not-print}
+        service_tokens_expected_minted: {example-automation: stub-reminted-value-do-not-print}
+      no_log: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role with the declared name in the re-mint list
+      ansible.builtin.include_role:
+        name: service_tokens
+      vars:
+        service_tokens_declared:
+          - login: svc-example
+            name: example-automation
+        service_tokens_remint: [example-automation]
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the exact delete-then-create requests and output facts
+      ansible.builtin.assert:
+        that:
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'GET', 'DELETE', 'POST']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/services?query=applicationName:%20YouTrack&fields=id,name,applicationName',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name',
+                '/hub/api/rest/users/user-1/permanenttokens/token-1',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name,token']
+          - >-
+            (stub_journal_response.json.requests | reverse | list)[4].request.body | from_json
+            == {'name': 'example-automation', 'scope': [{'id': 'service-1'}]}
+          - service_tokens_minted == service_tokens_expected_minted
+          - service_tokens_present == ['example-automation']
+        fail_msg: "The re-mint case did not delete and create in order or returned unexpected service token facts."
+      no_log: true
+
+- name: Case service_tokens - duplicate named tokens fail without writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with two tokens sharing the declared name
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/services}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody:
+                - {id: token-1, name: example-automation}
+                - {id: token-2, name: example-automation}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role and retain its failure for assertions
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - "{{ playbook_dir }}/run_service_tokens.yml"
+          - --extra-vars
+          - "{{ {'service_tokens_declared': [{'login': 'svc-example', 'name': 'example-automation'}]} | to_json }}"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      failed_when: false
+      register: service_tokens_duplicate_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert duplicate failure, exact reads, and no writes
+      ansible.builtin.assert:
+        that:
+          - service_tokens_duplicate_run.rc != 0
+          - >-
+            (service_tokens_duplicate_run.stdout ~ service_tokens_duplicate_run.stderr)
+            is search('Hub user svc-example has 2 permanent tokens named example-automation')
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'GET']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/services?query=applicationName:%20YouTrack&fields=id,name,applicationName',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name']
+          - stub_writes | length == 0
+        fail_msg: "Duplicate named tokens did not fail with the expected message before writing."
+
+- name: Case service_tokens - an unknown login fails without writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings with no exact user match
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role and retain its failure for assertions
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - "{{ playbook_dir }}/run_service_tokens.yml"
+          - --extra-vars
+          - "{{ {'service_tokens_declared': [{'login': 'unknown-service', 'name': 'example-automation'}]} | to_json }}"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      failed_when: false
+      register: service_tokens_unknown_user_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert unknown login failure, its exact request, and no writes
+      ansible.builtin.assert:
+        that:
+          - service_tokens_unknown_user_run.rc != 0
+          - >-
+            (service_tokens_unknown_user_run.stdout ~ service_tokens_unknown_user_run.stderr)
+            is search(
+              'Expected exactly one Hub user with login unknown-service; found 0. The role '
+              ~ 'does not create users.'
+            )
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list) == ['GET']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20unknown-service&fields=id,login']
+          - stub_writes | length == 0
+        fail_msg: "An unknown login did not fail with the expected message before writing."
+
+- name: Case service_tokens - check mode reports the missing token and sends no writes
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing permanent token
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/services}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role in check mode
+      ansible.builtin.command:
+        argv:
+          - ansible-playbook
+          - --check
+          - "{{ playbook_dir }}/run_service_tokens.yml"
+          - --extra-vars
+          - "{{ {'service_tokens_declared': [{'login': 'svc-example', 'name': 'example-automation'}]} | to_json }}"
+      environment:
+        ANSIBLE_ROLES_PATH: "{{ roles_dir }}"
+        YTC_TEST_URL: "{{ youtrack_url }}"
+        YTC_TEST_KEY: "{{ youtrack_api_key }}"
+      no_log: true
+      changed_when: false
+      register: service_tokens_check_run
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert check mode reports a change and sends only exact reads
+      ansible.builtin.assert:
+        that:
+          - service_tokens_check_run.rc == 0
+          - service_tokens_check_run.stdout is search('changed=1([^0-9]|$)')
+          - "' failed=0 ' in service_tokens_check_run.stdout"
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'GET']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/services?query=applicationName:%20YouTrack&fields=id,name,applicationName',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name']
+          - stub_writes | length == 0
+        fail_msg: "Check mode did not report the planned token create or sent a write request."
+
+- name: Case service_tokens - a service ID override skips the services lookup
+  block:
+    - name: Reset the stub
+      ansible.builtin.include_tasks: ../tasks/stub_reset.yml
+    - name: Load the mappings for a missing token with a service ID override
+      ansible.builtin.set_fact:
+        stub_mappings:
+          - request: {method: GET, urlPath: /hub/api/rest/users}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: [{id: user-1, login: svc-example}]
+          - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+          - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
+            response:
+              status: 201
+              headers: "{{ stub_json }}"
+              jsonBody: {id: token-1, name: example-automation, token: stub-override-value-do-not-print}
+        service_tokens_expected_minted: {example-automation: stub-override-value-do-not-print}
+      no_log: true
+    - name: Load the stub mappings
+      ansible.builtin.include_tasks: ../tasks/stub_load.yml
+    - name: Run the service_tokens role with an explicit service ID
+      ansible.builtin.include_role:
+        name: service_tokens
+      vars:
+        service_tokens_hub_service_id: override-service-1
+        service_tokens_declared:
+          - login: svc-example
+            name: example-automation
+    - name: Read the journal
+      ansible.builtin.include_tasks: ../tasks/stub_journal.yml
+    - name: Assert the exact requests skip services lookup and use the override scope
+      ansible.builtin.assert:
+        that:
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.method') | list)
+            == ['GET', 'GET', 'POST']
+          - >-
+            (stub_journal_response.json.requests | reverse | map(attribute='request.url') | list)
+            == ['/hub/api/rest/users?query=login:%20svc-example&fields=id,login',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name',
+                '/hub/api/rest/users/user-1/permanenttokens?fields=id,name,token']
+          - >-
+            (stub_journal_response.json.requests | reverse | list)[2].request.body | from_json
+            == {'name': 'example-automation', 'scope': [{'id': 'override-service-1'}]}
+          - service_tokens_minted == service_tokens_expected_minted
+          - service_tokens_present == ['example-automation']
+        fail_msg: "The service ID override did not skip service lookup or scope the new token correctly."
+      no_log: true

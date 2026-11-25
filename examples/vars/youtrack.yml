@@ -47,3 +47,8 @@ link_types_declared:
     source_to_target: Part of
     target_to_source: Part of
     aggregation: true
+
+# The calling play should store new values from service_tokens_minted in its secret store.
+service_tokens_declared:
+  - login: svc-example
+    name: example-automation

@@ -1,8 +1,9 @@
 # ansible-youtrack
 
 Ansible collection `jpe_ansible.youtrack`. Its roles make a JetBrains YouTrack configuration match a declared
-configuration. They manage enum, state, version, build, owned and user bundles, global custom fields, and issue link types. One role, `export`,
-reads a server's configuration into a local JSON file and changes nothing on the server.
+configuration. They manage enum, state, version, build, owned and user bundles, global custom fields, issue link types,
+and named Hub permanent tokens for service users. One role, `export`, reads a server's configuration into a local JSON
+file and changes nothing on the server.
 
 [![CI Gate][ci-badge]][ci-runs] [![License][license-badge]](LICENSE)
 
@@ -66,6 +67,7 @@ user) uses a bundle, so the bundle must exist.
 | `jpe_ansible.youtrack.bundles` | Enum, state, version, build, owned and user bundles and their values. | [README](roles/bundles/README.md) |
 | `jpe_ansible.youtrack.custom_fields` | Global custom fields and their project attachments. | [README](roles/custom_fields/README.md) |
 | `jpe_ansible.youtrack.link_types` | Issue link types and their labels and flags. | [README](roles/link_types/README.md) |
+| `jpe_ansible.youtrack.service_tokens` | Named Hub permanent tokens for existing YouTrack service users. | [README](roles/service_tokens/README.md) |
 | `jpe_ansible.youtrack.export` | A server's configuration, written to one local JSON file. Changes nothing on the server. | [README](roles/export/README.md) |
 
 ## Variable reference
@@ -94,8 +96,10 @@ Each role takes the lists shown below. An empty list, the default, changes nothi
 | `bundles_user` | `bundles` | `[]` | `name`, `users`, `groups` |
 | `custom_fields_declared` | `custom_fields` | `[]` | `name`, `field_type`, `bundle`, `projects`, `can_be_empty`, `project_overrides` |
 | `link_types_declared` | `link_types` | `[]` | `name`, `source_to_target`, `target_to_source`, `directed`, `aggregation` |
+| `service_tokens_declared` | `service_tokens` | `[]` | `login`, `name` |
 
-The entry fields, their types and their defaults are in each role's README.
+The entry fields, their types and their defaults are in each role's README. The service tokens role also accepts
+`service_tokens_hub_url`, `service_tokens_hub_service_id`, and `service_tokens_remint`; see its README.
 
 ## Behavior
 
@@ -118,8 +122,13 @@ instead of guessing.
 
 ### Additive only
 
-The roles create and update. They never delete a bundle, a bundle value, a custom field, a project attachment or a
-link type. They never rename one either. An item that the declaration does not name stays as it is.
+The configuration roles create and update. They never delete a bundle, a bundle value, a custom field, a project
+attachment or a link type. They never rename one either. The service tokens role deletes a permanent token only when
+its name is listed in `service_tokens_remint`. An item that the declaration does not name stays as it is.
+
+The service tokens role returns only newly created values in the `service_tokens_minted` fact, and hides that fact
+from task output. The calling play is responsible for storing those values in its secret store. The
+`service_tokens_present` fact lists the declared names that exist after the run.
 
 ### Refusals
 
@@ -133,6 +142,7 @@ cases:
 - A named bundle or project does not exist.
 - A bundle declares the same value name twice.
 - A list has more entries than the read limit of 10000. The run stops rather than act on a partial list.
+- A service user login does not match exactly one Hub user, or more than one token for that user has the declared name.
 
 ### Export
 
