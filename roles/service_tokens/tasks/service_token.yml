@@ -21,17 +21,25 @@
           Finding Hub user {{ service_tokens_item.login }} failed with HTTP status
           {{ ansible_failed_result.status | default('unknown') }}.
 
+- name: Keep the Hub user list from the paged response
+  ansible.builtin.set_fact:
+    service_tokens_user_list: >-
+      {{ service_tokens_user_response.json.users | default([])
+         if service_tokens_user_response.json is mapping
+         else service_tokens_user_response.json }}
+  no_log: true
+
 - name: Stop when the Hub user lookup does not return a list
   ansible.builtin.assert:
     that:
-      - service_tokens_user_response.json is sequence
-      - service_tokens_user_response.json is not mapping
+      - service_tokens_user_list is sequence
+      - service_tokens_user_list is not mapping
     fail_msg: "Finding Hub user {{ service_tokens_item.login }} returned a response that is not a list."
 
 - name: Keep users with the exact declared login
   ansible.builtin.set_fact:
     service_tokens_matching_users: >-
-      {{ service_tokens_user_response.json | selectattr('login', 'equalto', service_tokens_item.login) | list }}
+      {{ service_tokens_user_list | selectattr('login', 'equalto', service_tokens_item.login) | list }}
 
 - name: Stop unless exactly one Hub user has the declared login
   ansible.builtin.assert:
@@ -68,20 +76,29 @@
           Finding the YouTrack Hub service failed with HTTP status
           {{ ansible_failed_result.status | default('unknown') }}.
 
+- name: Keep the Hub service list from the paged response
+  ansible.builtin.set_fact:
+    service_tokens_service_list: >-
+      {{ service_tokens_service_response.json.services | default([])
+         if service_tokens_service_response.json is mapping
+         else service_tokens_service_response.json }}
+  no_log: true
+  when: service_tokens_resolved_service_id | length == 0
+
 - name: Stop unless exactly one Hub service is the YouTrack application
   ansible.builtin.assert:
     that:
-      - service_tokens_service_response.json is sequence
-      - service_tokens_service_response.json is not mapping
-      - service_tokens_service_response.json | length == 1
+      - service_tokens_service_list is sequence
+      - service_tokens_service_list is not mapping
+      - service_tokens_service_list | length == 1
     fail_msg: >-
       Expected exactly one Hub service for application YouTrack; found
-      {{ service_tokens_service_response.json | length }}.
+      {{ service_tokens_service_list | length }}.
   when: service_tokens_resolved_service_id | length == 0
 
 - name: Keep the YouTrack Hub service ID
   ansible.builtin.set_fact:
-    service_tokens_resolved_service_id: "{{ service_tokens_service_response.json[0].id }}"
+    service_tokens_resolved_service_id: "{{ service_tokens_service_list[0].id }}"
   when: service_tokens_resolved_service_id | length == 0
 
 - name: List the permanent tokens of the Hub user
@@ -106,18 +123,26 @@
           Reading permanent tokens for Hub user {{ service_tokens_item.login }} failed with HTTP status
           {{ ansible_failed_result.status | default('unknown') }}.
 
+- name: Keep the permanent token list from the paged response
+  ansible.builtin.set_fact:
+    service_tokens_user_token_list: >-
+      {{ service_tokens_user_tokens_response.json.permanenttokens | default([])
+         if service_tokens_user_tokens_response.json is mapping
+         else service_tokens_user_tokens_response.json }}
+  no_log: true
+
 - name: Stop when the permanent token lookup does not return a list
   ansible.builtin.assert:
     that:
-      - service_tokens_user_tokens_response.json is sequence
-      - service_tokens_user_tokens_response.json is not mapping
+      - service_tokens_user_token_list is sequence
+      - service_tokens_user_token_list is not mapping
     fail_msg: >-
       Reading permanent tokens for Hub user {{ service_tokens_item.login }} returned a response that is not a list.
 
 - name: Keep permanent tokens with the declared name
   ansible.builtin.set_fact:
     service_tokens_named_tokens: >-
-      {{ service_tokens_user_tokens_response.json | selectattr('name', 'equalto', service_tokens_item.name) | list }}
+      {{ service_tokens_user_token_list | selectattr('name', 'equalto', service_tokens_item.name) | list }}
 
 - name: Stop when the Hub user has duplicate tokens with the declared name
   ansible.builtin.assert:
