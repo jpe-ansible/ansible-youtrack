@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.7.0...v0.7.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **service_tokens:** read Hub page objects for users, services and tokens ([cc4cb1b](https://github.com/jpe-ansible/ansible-youtrack/commit/cc4cb1b8cb957a3561bc26c72f231d1c78cdd99b))
+
 ## [0.7.0](https://github.com/jpe-ansible/ansible-youtrack/compare/v0.6.0...v0.7.0) (2026-11-25)
 
 
