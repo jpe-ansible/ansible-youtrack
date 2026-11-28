@@ -10,14 +10,21 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/services}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                services: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
-            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {skip: 0, top: 100, total: 0, permanenttokens: []}
           - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
             response:
               status: 201
@@ -67,17 +74,25 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/services}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                services: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: token-1, name: example-automation}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                permanenttokens: [{id: token-1, name: example-automation}]
     - name: Load the stub mappings
       ansible.builtin.include_tasks: ../tasks/stub_load.yml
     - name: Run the service_tokens role
@@ -116,17 +131,25 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/services}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                services: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: token-1, name: example-automation}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                permanenttokens: [{id: token-1, name: example-automation}]
           - request: {method: DELETE, urlPath: /hub/api/rest/users/user-1/permanenttokens/token-1}
             response: {status: 204}
           - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
@@ -180,19 +203,27 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/services}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                services: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
             response:
               status: 200
               headers: "{{ stub_json }}"
               jsonBody:
-                - {id: token-1, name: example-automation}
-                - {id: token-2, name: example-automation}
+                skip: 0
+                top: 100
+                total: 2
+                permanenttokens:
+                  - {id: token-1, name: example-automation}
+                  - {id: token-2, name: example-automation}
     - name: Load the stub mappings
       ansible.builtin.include_tasks: ../tasks/stub_load.yml
     - name: Run the service_tokens role and retain its failure for assertions
@@ -287,14 +318,21 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/services}
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
+              jsonBody:
+                skip: 0
+                top: 100
+                total: 1
+                services: [{id: service-1, name: YouTrack, applicationName: YouTrack}]
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
-            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {skip: 0, top: 100, total: 0, permanenttokens: []}
     - name: Load the stub mappings
       ansible.builtin.include_tasks: ../tasks/stub_load.yml
     - name: Run the service_tokens role in check mode
@@ -342,9 +380,12 @@
             response:
               status: 200
               headers: "{{ stub_json }}"
-              jsonBody: [{id: user-1, login: svc-example}]
+              jsonBody: {skip: 0, top: 100, total: 1, users: [{id: user-1, login: svc-example}]}
           - request: {method: GET, urlPath: /hub/api/rest/users/user-1/permanenttokens}
-            response: {status: 200, headers: "{{ stub_json }}", jsonBody: []}
+            response:
+              status: 200
+              headers: "{{ stub_json }}"
+              jsonBody: {skip: 0, top: 100, total: 0, permanenttokens: []}
           - request: {method: POST, urlPath: /hub/api/rest/users/user-1/permanenttokens}
             response:
               status: 201
